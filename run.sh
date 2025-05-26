@@ -1,9 +1,9 @@
 #!/bin/bash
 
 
-# @cmd build cmake
-# @alias b
-buildit() {
+# @cmd compile project
+# @alias c
+compileit() {
     CURR_DIR=$(pwd)
     if [[ ! -d "$TOP_HEAD/build" ]] then
         mkdir "$TOP_HEAD/build";
@@ -17,9 +17,9 @@ buildit() {
 }
 
 
-# @cmd make project
-# @alias m
-makeit() {
+# @cmd build project
+# @alias b
+buildit() {
     CURR_DIR=$(pwd)
     cd "$TOP_HEAD/build"
     make
