@@ -1,8 +1,10 @@
 #include <iostream>
 
+#include "concord/types_polygon.hpp"
 #include "geoson/parser.hpp"
 #include "geoson/writter.hpp"
 #include "rerun/recording_stream.hpp"
+#include "spdlog/spdlog.h"
 
 int main() {
     auto rec = std::make_shared<rerun::RecordingStream>("farmtrax", "space");
@@ -14,13 +16,18 @@ int main() {
     try {
         auto fc = geoson::ReadFeatureCollection("misc/field4.geojson");
 
-        std::cout << fc << "\n";
+        concord::Polygon poly;
+        for (auto &f : fc.features) {
+            if (std::get_if<concord::Polygon>(&f.geometry)) {
+                poly = std::get<concord::Polygon>(f.geometry);
+                spdlog::info("Found polygon");
+                break;
+            }
+        }
 
-        fc.datum.lat += 5.1;
-        std::cout << "new datum is: " << fc.datum.lat << ", " << fc.datum.lon << ", " << fc.datum.alt << "\n";
-
+        fc.datum.lat -= 0.1;
         geoson::WriteFeatureCollection(fc, "misc/field4.geojson");
-        std::cout << "Saved modified GeoJSON to misc/field4_modified.geojson\n";
+        spdlog::info("Saved modified GeoJSON to misc/field4_modified.geojson");
     } catch (std::exception &e) {
         std::cerr << "ERROR: " << e.what() << "\n";
         return 1;
