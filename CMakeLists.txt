@@ -92,6 +92,10 @@ if(FARMTRAX_BUILD_EXAMPLES)
   FetchContent_Declare(spdlog GIT_REPOSITORY https://github.com/gabime/spdlog.git GIT_TAG v1.15.0)
   FetchContent_MakeAvailable(spdlog)
   list(APPEND ext_deps spdlog::spdlog)
+
+  FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
+  FetchContent_MakeAvailable(json)
+  list(APPEND ext_deps nlohmann_json::nlohmann_json)
   
   set(exe
     examples/main.cpp
