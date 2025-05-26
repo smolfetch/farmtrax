@@ -13,10 +13,9 @@ int main() {
         return 1;
     }
 
+    concord::Polygon poly;
     try {
         auto fc = geoson::ReadFeatureCollection("misc/field4.geojson");
-
-        concord::Polygon poly;
         for (auto &f : fc.features) {
             if (std::get_if<concord::Polygon>(&f.geometry)) {
                 poly = std::get<concord::Polygon>(f.geometry);
@@ -24,13 +23,14 @@ int main() {
                 break;
             }
         }
-
-        fc.datum.lat -= 0.1;
-        geoson::WriteFeatureCollection(fc, "misc/field4.geojson");
-        spdlog::info("Saved modified GeoJSON to misc/field4_modified.geojson");
     } catch (std::exception &e) {
-        std::cerr << "ERROR: " << e.what() << "\n";
+        spdlog::error("Failed to parse geojson: {}", e.what());
         return 1;
     }
+
+    for (auto &p : poly.getPoints()) {
+        spdlog::info("x: {}, y: {}, z: {}\n", p.enu.x, p.enu.y, p.enu.z);
+    }
+
     return 0;
 }
