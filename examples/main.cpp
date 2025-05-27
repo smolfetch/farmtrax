@@ -54,5 +54,10 @@ int main() {
     std::filesystem::path outPath = "output.tif";
     geotiv::WriteRasterCollection(rc, outPath);
 
+    field.gen_field(0.1, 0.0, 1);
+
+    auto swath_nr = field.get_parts()[0].swaths.size();
+    std::cout << "Swath count: " << swath_nr << "\n";
+
     return 0;
 }

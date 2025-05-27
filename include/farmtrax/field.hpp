@@ -118,6 +118,9 @@ namespace farmtrax {
         std::vector<Grid> grids_;
         std::vector<Part> parts_;
         double resolution_{};
+
+      private:
+        concord::Polygon border_;
         concord::Datum datum_{};
         entropy::NoiseGen noiseGen_;
         std::mt19937 rnd_{};
@@ -125,10 +128,9 @@ namespace farmtrax {
       public:
         Field() = default;
 
-        Field(const concord::Polygon &coordinates, double resolution, const concord::Datum &datum = {},
-              bool centred = true)
-            : resolution_(resolution), datum_(datum) {
-            grids_.emplace_back(coordinates, resolution, datum, centred);
+        Field(const concord::Polygon &border, double resolution, const concord::Datum &datum, bool centred = true)
+            : resolution_(resolution), border_(border), datum_(datum) {
+            grids_.emplace_back(border_, resolution_, datum_, centred);
         }
 
         Grid &get_grid(std::size_t i) {
@@ -165,38 +167,28 @@ namespace farmtrax {
         /**
          * @brief Generate headlands & swaths from a border polygon.
          */
-        void gen_field(const concord::Polygon &border, double swath_width, double angle_degrees,
-                       int headland_count = 0) {
+        void gen_field(double swath_width, double angle_degrees, int headland_count = 0) {
             Part P;
-            P.border.polygon = border;
+            P.border.polygon = border_;
             P.border.uuid = boost::uuids::to_string(boost::uuids::random_generator()());
-
-            P.headlands = generate_headlands(swath_width, border, headland_count);
-
-            concord::Polygon interior = headland_count > 0 ? P.headlands.back().polygon : border;
-
+            P.headlands = generate_headlands(swath_width, headland_count);
+            concord::Polygon interior = headland_count > 0 ? P.headlands.back().polygon : border_;
             P.swaths = generate_swaths(swath_width, angle_degrees, interior);
-
             parts_.push_back(std::move(P));
         }
 
         /**
          * @brief Clip a template of swaths into the shrunken interior.
          */
-        void gen_field(const std::vector<Swath> &template_swaths, const concord::Polygon &border, double swath_width,
-                       int headland_count) {
+        void gen_field(const std::vector<Swath> &template_swaths, double swath_width, int headland_count) {
             Part P;
-            P.border.polygon = border;
+            P.border.polygon = border_;
             P.border.uuid = boost::uuids::to_string(boost::uuids::random_generator()());
-
-            P.headlands = generate_headlands(swath_width, border, headland_count);
+            P.headlands = generate_headlands(swath_width, headland_count);
             concord::Polygon interior = P.headlands.back().polygon;
-
             P.swaths = generate_swaths(template_swaths, interior);
-
             parts_.push_back(std::move(P));
         }
-
 
       private:
         using BPoint = boost::geometry::model::d2::point_xy<double>;
@@ -243,11 +235,11 @@ namespace farmtrax {
             return out;
         }
 
-        std::vector<Ring> generate_headlands(double shrink_dist, const concord::Polygon &poly, int count) const {
+        std::vector<Ring> generate_headlands(double shrink_dist, int count) const {
             if (shrink_dist < 0)
                 throw std::invalid_argument("negative shrink");
             std::vector<Ring> H;
-            BPolygon base = to_boost(poly);
+            BPolygon base = to_boost(border_);
 
             for (int i = 0; i < count; ++i) {
                 BPolygon current = (i == 0 ? base : to_boost(H.back().polygon));
