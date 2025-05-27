@@ -84,18 +84,23 @@ export(EXPORT ${project_name}Targets
 # --------------------------------------------------------------------------------------------------
 if(FARMTRAX_BUILD_EXAMPLES)
   set(RERUN_DOWNLOAD_AND_BUILD_ARROW OFF)
-
   FetchContent_Declare(rerun_sdk URL https://github.com/rerun-io/rerun/releases/latest/download/rerun_cpp_sdk.zip)
   FetchContent_MakeAvailable(rerun_sdk)
   list(APPEND ext_deps rerun_sdk)
-
-  FetchContent_Declare(spdlog GIT_REPOSITORY https://github.com/gabime/spdlog.git GIT_TAG v1.15.0)
-  FetchContent_MakeAvailable(spdlog)
-  list(APPEND ext_deps spdlog::spdlog)
-
+  #
+  # FetchContent_Declare(spdlog GIT_REPOSITORY https://github.com/gabime/spdlog.git GIT_TAG v1.15.0)
+  # FetchContent_MakeAvailable(spdlog)
+  # list(APPEND ext_deps spdlog::spdlog)
+  #
   FetchContent_Declare(json URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz)
   FetchContent_MakeAvailable(json)
   list(APPEND ext_deps nlohmann_json::nlohmann_json)
+
+  set(Boost_INCLUDE_DIR "/usr/include")
+  set(sys_deps)
+  find_package(Boost REQUIRED)
+  include_directories(${Boost_INCLUDE_DIRS})
+  list(APPEND sys_deps ${Boost_LIBRARIES})
   
   set(exe
     examples/main.cpp
@@ -110,6 +115,7 @@ if(FARMTRAX_BUILD_EXAMPLES)
         target_sources(${exec_name} PRIVATE "${lib_file}")
       endforeach()
     target_link_libraries(${exec_name} ${ext_deps})
+    target_link_libraries(${exec_name} ${sys_deps})
     install(TARGETS ${exec_name} DESTINATION bin)
     list(APPEND exec_names ${exec_name})
   endforeach()
