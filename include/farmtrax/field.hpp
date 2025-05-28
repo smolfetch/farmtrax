@@ -19,6 +19,7 @@
 #include <boost/geometry/geometries/multi_polygon.hpp>
 #include <boost/geometry/geometries/point_xy.hpp>
 #include <boost/geometry/geometries/polygon.hpp>
+#include <boost/geometry/index/rtree.hpp>
 #include <boost/geometry/strategies/buffer.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -33,20 +34,51 @@
 #include "farmtrax/utils/utils.hpp"
 
 namespace farmtrax {
+    using BPoint = boost::geometry::model::d2::point_xy<double>;
+    using BLineString = boost::geometry::model::linestring<BPoint>;
+    using BPolygon = boost::geometry::model::polygon<BPoint>;
+    using BBox = boost::geometry::model::box<BPoint>;
+
+    // R-tree value types for different geometry types
+    using SwathRTreeValue = std::pair<BBox, std::size_t>;   // Bounding box + swath index
+    using RingRTreeValue = std::pair<BBox, std::size_t>;    // Bounding box + ring index
+    using PointRTreeValue = std::pair<BPoint, std::size_t>; // Point + index
+
+    // R-tree types
+    using SwathRTree = boost::geometry::index::rtree<SwathRTreeValue, boost::geometry::index::quadratic<16>>;
+    using RingRTree = boost::geometry::index::rtree<RingRTreeValue, boost::geometry::index::quadratic<16>>;
+    using PointRTree = boost::geometry::index::rtree<PointRTreeValue, boost::geometry::index::quadratic<16>>;
+
     struct Ring {
         concord::Polygon polygon;
         std::string uuid;
+        bool finished;
+        BPolygon b_polygon;
+        BBox bounding_box; // Add bounding box for R-tree
     };
+
+    inline Ring create_ring(const concord::Polygon &poly, std::string uuid = "") {
+        if (uuid.empty())
+            uuid = boost::uuids::to_string(boost::uuids::random_generator()());
+        Ring ring = {poly, uuid, false};
+        // Convert to boost polygon and compute bounding box
+        ring.b_polygon = boost::geometry::model::polygon<BPoint>();
+        for (auto const &pt : poly.getPoints()) {
+            ring.b_polygon.outer().emplace_back(pt.enu.x, pt.enu.y);
+        }
+        if (!boost::geometry::equals(ring.b_polygon.outer().front(), ring.b_polygon.outer().back()))
+            ring.b_polygon.outer().push_back(ring.b_polygon.outer().front());
+        boost::geometry::correct(ring.b_polygon);
+        ring.bounding_box = boost::geometry::return_envelope<BBox>(ring.b_polygon);
+        return ring;
+    }
 
     struct Swath {
         concord::Line line;
         std::string uuid;
-        void flip() {
-            concord::Line tmp = line;
-            tmp.setStart(line.getEnd());
-            tmp.setEnd(line.getStart());
-            line = tmp;
-        }
+        bool finished;
+        BLineString b_line;
+        BBox bounding_box; // Add bounding box for R-tree
     };
 
     inline Swath create_swath(const concord::Point &start, const concord::Point &end, std::string uuid = "") {
@@ -55,13 +87,47 @@ namespace farmtrax {
         L.setEnd(end);
         if (uuid.empty())
             uuid = boost::uuids::to_string(boost::uuids::random_generator()());
-        return {L, uuid};
+
+        Swath swath = {L, uuid, false};
+        // Convert to boost linestring and compute bounding box
+        swath.b_line.emplace_back(start.enu.x, start.enu.y);
+        swath.b_line.emplace_back(end.enu.x, end.enu.y);
+        swath.bounding_box = boost::geometry::return_envelope<BBox>(swath.b_line);
+        return swath;
     }
 
     struct Part {
         Ring border;
         std::vector<Swath> swaths;
         std::vector<Ring> headlands;
+
+        // R-trees for spatial indexing
+        SwathRTree swath_rtree;
+        RingRTree headland_rtree;
+        PointRTree swath_endpoints_rtree; // For start/end points of swaths
+
+        void rebuild_rtrees() {
+            // Clear existing trees
+            swath_rtree.clear();
+            headland_rtree.clear();
+            swath_endpoints_rtree.clear();
+
+            // Rebuild swath R-tree
+            for (std::size_t i = 0; i < swaths.size(); ++i) {
+                swath_rtree.insert(std::make_pair(swaths[i].bounding_box, i));
+
+                // Add start and end points to point R-tree
+                BPoint start_pt(swaths[i].line.getStart().enu.x, swaths[i].line.getStart().enu.y);
+                BPoint end_pt(swaths[i].line.getEnd().enu.x, swaths[i].line.getEnd().enu.y);
+                swath_endpoints_rtree.insert(std::make_pair(start_pt, i * 2));   // Even indices for start points
+                swath_endpoints_rtree.insert(std::make_pair(end_pt, i * 2 + 1)); // Odd indices for end points
+            }
+
+            // Rebuild headland R-tree
+            for (std::size_t i = 0; i < headlands.size(); ++i) {
+                headland_rtree.insert(std::make_pair(headlands[i].bounding_box, i));
+            }
+        }
     };
 
     using Grid = concord::Grid<uint8_t>;
@@ -88,8 +154,7 @@ namespace farmtrax {
             parts_.reserve(divisions.size());
             for (auto const &poly : divisions) {
                 Part p;
-                p.border.polygon = poly;
-                p.border.uuid = boost::uuids::to_string(boost::uuids::random_generator()());
+                p.border = create_ring(poly);
                 parts_.push_back(std::move(p));
             }
         }
@@ -107,6 +172,7 @@ namespace farmtrax {
         }
 
         const std::vector<Part> &get_parts() const { return parts_; }
+        std::vector<Part> &get_parts() { return parts_; }
 
         void add_noise(std::size_t i = 0) {
             Grid &g = get_grid(i);
@@ -121,22 +187,117 @@ namespace farmtrax {
                 }
         }
 
-        void gen_field(double swath_width, double angle_degrees, int headland_count = 1) {
+        void gen_field(double swath_width, double angle_degrees = 0, int headland_count = 1) {
             for (auto &part : parts_) {
                 part.headlands.clear();
                 part.swaths.clear();
                 part.headlands = generate_headlands(part.border.polygon, swath_width, headland_count);
                 concord::Polygon interior = headland_count > 0 ? part.headlands.back().polygon : part.border.polygon;
                 part.swaths = generate_swaths(swath_width, angle_degrees, interior);
+
+                // Rebuild R-trees after generating new geometry
+                part.rebuild_rtrees();
             }
         }
 
-      private:
-        using BPoint = boost::geometry::model::d2::point_xy<double>;
-        using BLineString = boost::geometry::model::linestring<BPoint>;
-        using BPolygon = boost::geometry::model::polygon<BPoint>;
-        using BMultiPoly = boost::geometry::model::multi_polygon<BPolygon>;
+        // Spatial query methods using R-tree
+        std::vector<std::size_t> find_nearby_swaths(std::size_t part_idx, const BPoint &query_point,
+                                                    double radius) const {
+            if (part_idx >= parts_.size())
+                return {};
 
+            const auto &part = parts_[part_idx];
+            std::vector<std::size_t> result;
+
+            // Create search box around query point
+            BBox search_box(BPoint(query_point.x() - radius, query_point.y() - radius),
+                            BPoint(query_point.x() + radius, query_point.y() + radius));
+
+            // Query R-tree
+            std::vector<SwathRTreeValue> candidates;
+            part.swath_rtree.query(boost::geometry::index::intersects(search_box), std::back_inserter(candidates));
+
+            // Filter by actual distance
+            for (const auto &candidate : candidates) {
+                std::size_t idx = candidate.second;
+                if (idx < part.swaths.size()) {
+                    double dist = boost::geometry::distance(query_point, part.swaths[idx].b_line);
+                    if (dist <= radius) {
+                        result.push_back(idx);
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        std::vector<std::size_t> find_nearest_swath_endpoints(std::size_t part_idx, const BPoint &query_point,
+                                                              std::size_t k = 1) const {
+            if (part_idx >= parts_.size())
+                return {};
+
+            const auto &part = parts_[part_idx];
+            std::vector<PointRTreeValue> nearest;
+            part.swath_endpoints_rtree.query(boost::geometry::index::nearest(query_point, k),
+                                             std::back_inserter(nearest));
+
+            std::vector<std::size_t> result;
+            for (const auto &point_value : nearest) {
+                result.push_back(point_value.second);
+            }
+            return result;
+        }
+
+        // Find optimal swath traversal order using R-tree for nearest neighbor queries
+        std::vector<std::size_t> optimize_swath_order(std::size_t part_idx, const BPoint &start_point) const {
+            if (part_idx >= parts_.size())
+                return {};
+
+            const auto &part = parts_[part_idx];
+            if (part.swaths.empty())
+                return {};
+
+            std::vector<std::size_t> order;
+            std::vector<bool> visited(part.swaths.size(), false);
+            BPoint current_pos = start_point;
+
+            for (std::size_t i = 0; i < part.swaths.size(); ++i) {
+                double min_dist = std::numeric_limits<double>::max();
+                std::size_t next_swath = 0;
+
+                // Use R-tree to find nearby candidates first
+                auto nearby = find_nearby_swaths(part_idx, current_pos, min_dist);
+
+                // Find closest unvisited swath
+                for (std::size_t j = 0; j < part.swaths.size(); ++j) {
+                    if (visited[j])
+                        continue;
+
+                    double dist_to_start =
+                        boost::geometry::distance(current_pos, BPoint(part.swaths[j].line.getStart().enu.x,
+                                                                      part.swaths[j].line.getStart().enu.y));
+                    double dist_to_end = boost::geometry::distance(
+                        current_pos, BPoint(part.swaths[j].line.getEnd().enu.x, part.swaths[j].line.getEnd().enu.y));
+
+                    double min_swath_dist = std::min(dist_to_start, dist_to_end);
+                    if (min_swath_dist < min_dist) {
+                        min_dist = min_swath_dist;
+                        next_swath = j;
+                    }
+                }
+
+                visited[next_swath] = true;
+                order.push_back(next_swath);
+
+                // Update current position to end of chosen swath
+                current_pos =
+                    BPoint(part.swaths[next_swath].line.getEnd().enu.x, part.swaths[next_swath].line.getEnd().enu.y);
+            }
+
+            return order;
+        }
+
+      private:
         BPoint to_boost(const concord::Point &in) const { return BPoint{in.enu.x, in.enu.y}; }
 
         concord::Point from_boost(const BPoint &in) const {
@@ -188,7 +349,7 @@ namespace farmtrax {
 
             for (int i = 0; i < count; ++i) {
                 BPolygon current = (i == 0 ? base : to_boost(H.back().polygon));
-                BMultiPoly buf;
+                boost::geometry::model::multi_polygon<BPolygon> buf;
                 boost::geometry::strategy::buffer::distance_symmetric<double> dist(-shrink_dist);
                 boost::geometry::strategy::buffer::side_straight side;
                 boost::geometry::strategy::buffer::join_miter join;
@@ -226,46 +387,38 @@ namespace farmtrax {
                 concord::Polygon simp = utils::remove_colinear_points(tmp, 1e-4);
                 simp.addPoint(simp.getPoints().front());
 
-                H.push_back({std::move(simp), boost::uuids::to_string(boost::uuids::random_generator()())});
+                H.push_back(create_ring(std::move(simp)));
             }
             return H;
         }
-        std::vector<Swath> generate_swaths(const std::vector<Swath> &templ, const concord::Polygon &field) const {
-            std::vector<Swath> out;
-            BPolygon Bf = to_boost(field);
-            for (auto const &s : templ) {
-                BLineString L = to_boost(s.line);
-                std::vector<BLineString> clips;
-                boost::geometry::intersection(L, Bf, clips);
-                for (auto const &seg : clips) {
-                    if (boost::geometry::length(seg) < 1e-6)
-                        continue;
-                    concord::Point a = from_boost(seg.front());
-                    concord::Point b = from_boost(seg.back());
-                    out.push_back(create_swath(a, b, s.uuid));
-                }
-            }
-            return out;
-        }
 
         std::vector<Swath> generate_swaths(double swath_width, double angle_deg, const concord::Polygon &border) const {
+            if (angle_deg == 0.0) {
+                std::vector<Swath> best_out;
+                std::size_t best_count = std::numeric_limits<std::size_t>::max();
+                for (int deg = 1; deg < 360; ++deg) {
+                    auto out = generate_swaths(swath_width, static_cast<double>(deg), border);
+                    if (out.size() < best_count) {
+                        best_count = out.size();
+                        best_out = std::move(out);
+                    }
+                }
+                return best_out;
+            }
+
             std::vector<Swath> out;
             BPolygon bounds = to_boost(border);
             double rad = angle_deg * M_PI / 180.0;
-
-            // Compute polygon centroid more robustly
             BPoint centroid;
             boost::geometry::centroid(bounds, centroid);
             double cx = centroid.x();
             double cy = centroid.y();
-
-            double cosA = std::cos(rad), sinA = std::sin(rad);
-
-            // Calculate a more reasonable extension based on polygon bounds
+            double cosA = std::cos(rad);
+            double sinA = std::sin(rad);
             auto bbox = boost::geometry::return_envelope<boost::geometry::model::box<BPoint>>(bounds);
             double width = bbox.max_corner().x() - bbox.min_corner().x();
             double height = bbox.max_corner().y() - bbox.min_corner().y();
-            double ext = std::max(width, height) * 2.0; // More reasonable extension
+            double ext = std::max(width, height) * 2.0;
 
             for (double offs = -ext; offs <= ext; offs += swath_width) {
                 concord::ENU e1{cx + offs * sinA - ext * cosA, cy - offs * cosA - ext * sinA, 0};
@@ -275,14 +428,16 @@ namespace farmtrax {
                 ray.emplace_back(e2.x, e2.y);
                 std::vector<BLineString> clips;
                 boost::geometry::intersection(ray, bounds, clips);
+
                 for (auto const &seg : clips) {
-                    if (boost::geometry::length(seg) < swath_width * 0.1) // More reasonable minimum length
+                    if (boost::geometry::length(seg) < swath_width * 0.1)
                         continue;
                     concord::Point a{concord::ENU{seg.front().x(), seg.front().y(), 0}, datum_};
                     concord::Point b{concord::ENU{seg.back().x(), seg.back().y(), 0}, datum_};
                     out.push_back(create_swath(a, b));
                 }
             }
+
             return out;
         }
     };
