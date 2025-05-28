@@ -30,43 +30,9 @@
 #include <concord/types_polygon.hpp>
 #include <entropy/noisegen.hpp>
 
+#include "farmtrax/utils/utils.hpp"
+
 namespace farmtrax {
-
-    inline uint8_t float_to_byte(float v, float min = 0.0f, float max = 255.0f) {
-        v = std::clamp(v, 0.0f, 1.0f);
-        float scaled = v * 255.0f;
-        float clamped = std::clamp(scaled, min, max);
-        return static_cast<uint8_t>(std::round(clamped));
-    }
-
-    inline bool are_colinear(const concord::Point &p1, const concord::Point &p2, const concord::Point &p3,
-                             double epsilon = 1e-10) {
-        using BPoint = boost::geometry::model::d2::point_xy<double>;
-        BPoint a{p1.enu.x, p1.enu.y}, b{p2.enu.x, p2.enu.y}, c{p3.enu.x, p3.enu.y};
-        double area = (boost::geometry::get<0>(a) * (boost::geometry::get<1>(b) - boost::geometry::get<1>(c)) +
-                       boost::geometry::get<0>(b) * (boost::geometry::get<1>(c) - boost::geometry::get<1>(a)) +
-                       boost::geometry::get<0>(c) * (boost::geometry::get<1>(a) - boost::geometry::get<1>(b))) *
-                      0.5;
-        return std::abs(area) < epsilon;
-    }
-
-    inline concord::Polygon remove_colinear_points(const concord::Polygon &polygon, double epsilon = 0.01) {
-        concord::Polygon result;
-        auto const &pts = polygon.getPoints();
-        if (pts.size() < 4)
-            return polygon;
-        size_t n = pts.size() - 1;
-        for (size_t i = 0; i < n; ++i) {
-            auto const &prev = pts[(i + n - 1) % n];
-            auto const &curr = pts[i];
-            auto const &next = pts[(i + 1) % n];
-            if (!are_colinear(prev, curr, next, epsilon))
-                result.addPoint(curr);
-        }
-        result.addPoint(pts.front());
-        return result;
-    }
-
     struct Ring {
         concord::Polygon polygon;
         std::string uuid;
@@ -110,14 +76,14 @@ namespace farmtrax {
         concord::Datum datum_{};
         entropy::NoiseGen noiseGen_;
         std::mt19937 rnd_;
-        double split_threshold_{0.3};
+        double overlap_threshold_{0.7};
 
       public:
         Field(const concord::Polygon &border, double resolution, const concord::Datum &datum, bool centred = true,
-              double split_threshold = 0.3)
-            : resolution_(resolution), border_(border), datum_(datum), split_threshold_(split_threshold) {
+              double overlap_threshold = 0.7, double area_threshold = 0.5)
+            : resolution_(resolution), border_(border), datum_(datum), overlap_threshold_(overlap_threshold) {
             grids_.emplace_back(border_, resolution_, datum_, centred);
-            auto divisions = split_recursive(border_, split_threshold_);
+            auto divisions = border.split_obb(overlap_threshold_);
             std::cout << "Split " << divisions.size() << " parts\n";
             parts_.reserve(divisions.size());
             for (auto const &poly : divisions) {
@@ -151,15 +117,15 @@ namespace farmtrax {
                 for (std::size_t c = 0; c < g.cols(); ++c) {
                     float n = noiseGen_.GetNoise(static_cast<float>(r), static_cast<float>(c));
                     float val = (n + 1.0f) * 0.5f;
-                    g(r, c).second = float_to_byte(val);
+                    g(r, c).second = utils::float_to_byte(val);
                 }
         }
 
-        void gen_field(double swath_width, double angle_degrees, int headland_count = 0) {
+        void gen_field(double swath_width, double angle_degrees, int headland_count = 1) {
             for (auto &part : parts_) {
                 part.headlands.clear();
                 part.swaths.clear();
-                part.headlands = generate_headlands(swath_width, headland_count);
+                part.headlands = generate_headlands(part.border.polygon, swath_width, headland_count);
                 concord::Polygon interior = headland_count > 0 ? part.headlands.back().polygon : part.border.polygon;
                 part.swaths = generate_swaths(swath_width, angle_degrees, interior);
             }
@@ -206,15 +172,21 @@ namespace farmtrax {
             concord::Polygon out;
             for (auto const &pt : poly.outer())
                 out.addPoint(from_boost(pt));
-            out.addPoint(from_boost(poly.outer().front()));
+            if (!out.getPoints().empty())
+                out.addPoint(from_boost(poly.outer().front()));
             return out;
         }
 
-        std::vector<Ring> generate_headlands(double shrink_dist, int count) const {
+        // Fixed: now takes a polygon parameter instead of using member variable
+        std::vector<Ring> generate_headlands(const concord::Polygon &polygon, double shrink_dist, int count) const {
+            if (shrink_dist <= 0 || count <= 0)
+                return {};
             if (shrink_dist < 0)
                 throw std::invalid_argument("negative shrink");
+
             std::vector<Ring> H;
-            BPolygon base = to_boost(border_);
+            BPolygon base = to_boost(polygon);
+
             for (int i = 0; i < count; ++i) {
                 BPolygon current = (i == 0 ? base : to_boost(H.back().polygon));
                 BMultiPoly buf;
@@ -223,9 +195,19 @@ namespace farmtrax {
                 boost::geometry::strategy::buffer::join_miter join;
                 boost::geometry::strategy::buffer::end_flat end;
                 boost::geometry::strategy::buffer::point_square point;
-                boost::geometry::buffer(current, buf, dist, side, join, end, point);
-                if (buf.empty())
-                    throw std::runtime_error("empty after buffer");
+
+                try {
+                    boost::geometry::buffer(current, buf, dist, side, join, end, point);
+                } catch (const std::exception &e) {
+                    std::cerr << "Buffer operation failed: " << e.what() << std::endl;
+                    break;
+                }
+
+                if (buf.empty()) {
+                    std::cerr << "Warning: empty buffer result at headland " << i << std::endl;
+                    break;
+                }
+
                 const BPolygon *best = &buf.front();
                 double maxA = boost::geometry::area(*best);
                 for (auto const &cand : buf) {
@@ -235,8 +217,14 @@ namespace farmtrax {
                         best = &cand;
                     }
                 }
+
+                if (maxA <= 0) {
+                    std::cerr << "Warning: zero area polygon at headland " << i << std::endl;
+                    break;
+                }
+
                 concord::Polygon tmp = from_boost(*best);
-                concord::Polygon simp = remove_colinear_points(tmp, 1e-4);
+                concord::Polygon simp = utils::remove_colinear_points(tmp, 1e-4);
                 H.push_back({std::move(simp), boost::uuids::to_string(boost::uuids::random_generator()())});
             }
             return H;
@@ -264,16 +252,21 @@ namespace farmtrax {
             std::vector<Swath> out;
             BPolygon bounds = to_boost(border);
             double rad = angle_deg * M_PI / 180.0;
-            double cx = 0, cy = 0;
-            auto const &pts = border.getPoints();
-            for (auto const &pt : pts) {
-                cx += pt.enu.x;
-                cy += pt.enu.y;
-            }
-            cx /= pts.size();
-            cy /= pts.size();
+
+            // Compute polygon centroid more robustly
+            BPoint centroid;
+            boost::geometry::centroid(bounds, centroid);
+            double cx = centroid.x();
+            double cy = centroid.y();
+
             double cosA = std::cos(rad), sinA = std::sin(rad);
-            double ext = swath_width * 1000.0;
+
+            // Calculate a more reasonable extension based on polygon bounds
+            auto bbox = boost::geometry::return_envelope<boost::geometry::model::box<BPoint>>(bounds);
+            double width = bbox.max_corner().x() - bbox.min_corner().x();
+            double height = bbox.max_corner().y() - bbox.min_corner().y();
+            double ext = std::max(width, height) * 2.0; // More reasonable extension
+
             for (double offs = -ext; offs <= ext; offs += swath_width) {
                 concord::ENU e1{cx + offs * sinA - ext * cosA, cy - offs * cosA - ext * sinA, 0};
                 concord::ENU e2{cx + offs * sinA + ext * cosA, cy - offs * cosA + ext * sinA, 0};
@@ -283,7 +276,7 @@ namespace farmtrax {
                 std::vector<BLineString> clips;
                 boost::geometry::intersection(ray, bounds, clips);
                 for (auto const &seg : clips) {
-                    if (boost::geometry::length(seg) < swath_width)
+                    if (boost::geometry::length(seg) < swath_width * 0.1) // More reasonable minimum length
                         continue;
                     concord::Point a{concord::ENU{seg.front().x(), seg.front().y(), 0}, datum_};
                     concord::Point b{concord::ENU{seg.back().x(), seg.back().y(), 0}, datum_};
@@ -291,95 +284,6 @@ namespace farmtrax {
                 }
             }
             return out;
-        }
-
-        BPoint compute_centroid(const BPolygon &poly) const {
-            BPoint c;
-            boost::geometry::centroid(poly, c);
-            return c;
-        }
-
-        double compute_eccentricity(const BPolygon &poly) const {
-            const auto &ring = poly.outer();
-            BPoint center = compute_centroid(poly);
-            std::vector<double> dists;
-            dists.reserve(ring.size());
-            for (auto const &p : ring) {
-                double dx = p.x() - center.x();
-                double dy = p.y() - center.y();
-                dists.push_back(std::hypot(dx, dy));
-            }
-            double mean = std::accumulate(dists.begin(), dists.end(), 0.0) / dists.size();
-            double var = 0.0;
-            for (double d : dists)
-                var += (d - mean) * (d - mean);
-            double stddev = std::sqrt(var / dists.size());
-            return stddev / mean;
-        }
-
-        std::pair<BPoint, BPoint> find_diameter(const BPolygon &poly) const {
-            const auto &ring = poly.outer();
-            double maxd2 = -1.0;
-            std::pair<BPoint, BPoint> best;
-            for (size_t i = 0; i < ring.size(); ++i) {
-                for (size_t j = i + 1; j < ring.size(); ++j) {
-                    double dx = ring[i].x() - ring[j].x();
-                    double dy = ring[i].y() - ring[j].y();
-                    double d2 = dx * dx + dy * dy;
-                    if (d2 > maxd2) {
-                        maxd2 = d2;
-                        best = {ring[i], ring[j]};
-                    }
-                }
-            }
-            return best;
-        }
-
-        std::vector<concord::Polygon> split_recursive(const concord::Polygon &in, double threshold) const {
-            BPolygon poly = to_boost(in);
-            double cv = compute_eccentricity(poly);
-            if (cv < threshold)
-                return {in};
-            std::vector<concord::Polygon> children = split_polygon(in);
-            std::vector<concord::Polygon> result;
-            for (auto const &ch : children) {
-                auto subs = split_recursive(ch, threshold);
-                result.insert(result.end(), subs.begin(), subs.end());
-            }
-            return result;
-        }
-
-        std::vector<concord::Polygon> split_polygon(const concord::Polygon &in) const {
-            BPolygon poly = to_boost(in);
-            auto [p1, p2] = find_diameter(poly);
-            BPoint mid{(p1.x() + p2.x()) / 2.0, (p1.y() + p2.y()) / 2.0};
-            double dx = p2.x() - p1.x(), dy = p2.y() - p1.y(), len = std::hypot(dx, dy);
-            dx /= len;
-            dy /= len;
-            double ux = -dy, uy = dx;
-            const double L = 1e6;
-            auto make_half = [&](int sign) {
-                BPolygon hp;
-                auto &o = hp.outer();
-                o.emplace_back(mid.x() + sign * ux * L, mid.y() + sign * uy * L);
-                o.emplace_back(mid.x() - sign * ux * L, mid.y() - sign * uy * L);
-                o.emplace_back(mid.x() - sign * ux * L + sign * dy * L, mid.y() - sign * uy * L - sign * dx * L);
-                o.emplace_back(mid.x() + sign * ux * L + sign * dy * L, mid.y() + sign * uy * L - sign * dx * L);
-                o.push_back(o.front());
-                boost::geometry::correct(hp);
-                return hp;
-            };
-            BPolygon half1 = make_half(+1), half2 = make_half(-1);
-            std::vector<BPolygon> out1, out2;
-            boost::geometry::intersection(poly, half1, out1);
-            boost::geometry::intersection(poly, half2, out2);
-            std::vector<concord::Polygon> result;
-            result.reserve(out1.size() + out2.size());
-            for (auto const &bp : out1)
-                result.push_back(from_boost(bp));
-            for (auto const &bp : out2)
-                result.push_back(from_boost(bp));
-            return result;
         }
     };
 

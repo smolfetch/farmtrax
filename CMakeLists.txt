@@ -5,7 +5,7 @@ set(project_name farmtrax)
 project(${project_name} VERSION 0.1.1 LANGUAGES CXX)
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    add_compile_options(-Wall -Wextra -Wpedantic)
+    add_compile_options(-Wno-all -Wno-extra -Wno-pedantic -Wno-maybe-uninitialized -Wno-unused-variable -Wno-reorder)
 endif()
 cmake_policy(SET CMP0074 NEW)
 cmake_policy(SET CMP0135 NEW)
