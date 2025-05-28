@@ -67,12 +67,12 @@ namespace farmtrax {
     using Grid = concord::Grid<uint8_t>;
 
     class Field {
+        concord::Polygon border_;
         std::vector<Grid> grids_;
         std::vector<Part> parts_;
         double resolution_{};
 
       private:
-        concord::Polygon border_;
         concord::Datum datum_{};
         entropy::NoiseGen noiseGen_;
         std::mt19937 rnd_;
@@ -177,7 +177,6 @@ namespace farmtrax {
             return out;
         }
 
-        // Fixed: now takes a polygon parameter instead of using member variable
         std::vector<Ring> generate_headlands(const concord::Polygon &polygon, double shrink_dist, int count) const {
             if (shrink_dist <= 0 || count <= 0)
                 return {};
@@ -225,11 +224,12 @@ namespace farmtrax {
 
                 concord::Polygon tmp = from_boost(*best);
                 concord::Polygon simp = utils::remove_colinear_points(tmp, 1e-4);
+                simp.addPoint(simp.getPoints().front());
+
                 H.push_back({std::move(simp), boost::uuids::to_string(boost::uuids::random_generator()())});
             }
             return H;
         }
-
         std::vector<Swath> generate_swaths(const std::vector<Swath> &templ, const concord::Polygon &field) const {
             std::vector<Swath> out;
             BPolygon Bf = to_boost(field);
