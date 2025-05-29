@@ -1,4 +1,5 @@
 #include <iostream>
+#include <thread>
 
 #include "concord/types_polygon.hpp"
 #include "geoson/parser.hpp"
@@ -8,6 +9,7 @@
 
 #include "rerun/recording_stream.hpp"
 
+#include "farmtrax/divy.hpp"
 #include "farmtrax/field.hpp"
 #include "rerun.hpp"
 
@@ -64,6 +66,20 @@ int main() {
 
     /// VISUALS
     farmtrax::visualize::show_field(field, rec);
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+
+    auto fieldPtr = std::make_shared<farmtrax::Field>(field);
+    farmtrax::Divy divy(fieldPtr, farmtrax::DivisionType::STRIP);
+
+    auto div = divy.divide(4);
+
+    farmtrax::visualize::show_divisions(div, rec);
+
+    std::this_thread::sleep_for(std::chrono::seconds(10));
+
+    auto div2 = divy.divide(3);
+
+    farmtrax::visualize::show_divisions(div2, rec);
 
     return 0;
 }
