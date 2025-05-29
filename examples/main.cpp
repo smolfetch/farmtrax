@@ -69,17 +69,15 @@ int main() {
     std::this_thread::sleep_for(std::chrono::seconds(10));
 
     auto fieldPtr = std::make_shared<farmtrax::Field>(field);
-    farmtrax::Divy divy(fieldPtr, farmtrax::DivisionType::STRIP);
+    farmtrax::Divy divy(fieldPtr, farmtrax::DivisionType::STRIP, 4);
 
-    auto div = divy.divide(4);
-
-    farmtrax::visualize::show_divisions(div, rec);
+    farmtrax::visualize::show_divisions(divy, rec);
 
     std::this_thread::sleep_for(std::chrono::seconds(10));
 
-    auto div2 = divy.divide(3);
+    divy.set_machine_count(3);
 
-    farmtrax::visualize::show_divisions(div2, rec);
+    farmtrax::visualize::show_divisions(divy, rec);
 
     return 0;
 }

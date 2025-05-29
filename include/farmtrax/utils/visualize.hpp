@@ -7,7 +7,6 @@
 #include "rerun.hpp"
 #include <array>
 #include <rerun/recording_stream.hpp>
-#include <unordered_map>
 #include <vector>
 
 namespace farmtrax {
@@ -17,51 +16,38 @@ namespace farmtrax {
          * @brief Visualize a Field’s parts (borders, headlands, swaths).
          */
         inline void show_field(const farmtrax::Field &field, std::shared_ptr<rerun::RecordingStream> rec) {
-            int mc = 120, sc = 70;
-            std::vector<std::vector<std::array<float, 3>>> borders;
-            for (auto const &part : field.get_parts()) {
+            for (size_t i = 0; i < field.get_parts().size(); ++i) {
                 std::vector<std::array<float, 3>> pts;
-                for (auto const &p : part.border.polygon.getPoints())
+                for (auto const &p : field.get_parts()[i].border.polygon.getPoints())
                     pts.push_back({{float(p.enu.x), float(p.enu.y), 0.0f}});
-                borders.push_back(pts);
-            }
-            for (size_t i = 0; i < borders.size(); ++i) {
-                auto c = rerun::Color(mc, sc, sc);
-                rec->log_static("/border" + std::to_string(i),
-                                rerun::LineStrips3D(rerun::components::LineStrip3D(borders[i]))
-                                    .with_colors({{c}})
-                                    .with_radii({{0.2f}}));
+                auto c = rerun::Color(120, 70, 70);
+                rec->log_static(
+                    "/border" + std::to_string(i),
+                    rerun::LineStrips3D(rerun::components::LineStrip3D(pts)).with_colors({{c}}).with_radii({{0.2f}}));
             }
 
             for (size_t i = 0; i < field.get_parts().size(); ++i) {
-                std::vector<std::vector<std::array<float, 3>>> headlands;
-                for (auto const &h : field.get_parts()[i].headlands) {
+                for (size_t j = 0; j < field.get_parts()[i].headlands.size(); ++j) {
                     std::vector<std::array<float, 3>> pts;
-                    for (auto const &p : h.polygon.getPoints())
+                    for (auto const &p : field.get_parts()[i].headlands[j].polygon.getPoints())
                         pts.push_back({{float(p.enu.x), float(p.enu.y), 0.0f}});
-                    headlands.push_back(pts);
-                }
-                for (size_t j = 0; j < headlands.size(); ++j) {
-                    auto c = rerun::Color(sc, mc, sc);
+                    auto c = rerun::Color(70, 120, 70);
                     rec->log_static("/headland" + std::to_string(i) + "_" + std::to_string(j),
-                                    rerun::LineStrips3D(rerun::components::LineStrip3D(headlands[j]))
+                                    rerun::LineStrips3D(rerun::components::LineStrip3D(pts))
                                         .with_colors({{c}})
                                         .with_radii({{0.2f}}));
                 }
             }
 
             for (size_t i = 0; i < field.get_parts().size(); ++i) {
-                std::vector<std::vector<std::array<float, 3>>> swaths;
-                for (auto const &s : field.get_parts()[i].swaths) {
+                for (size_t j = 0; j < field.get_parts()[i].swaths.size(); ++j) {
+                    auto const &s = field.get_parts()[i].swaths[j];
                     std::vector<std::array<float, 3>> pts = {
                         {{float(s.line.getStart().enu.x), float(s.line.getStart().enu.y), 0.0f},
                          {float(s.line.getEnd().enu.x), float(s.line.getEnd().enu.y), 0.0f}}};
-                    swaths.push_back(pts);
-                }
-                for (size_t j = 0; j < swaths.size(); ++j) {
-                    auto c = rerun::Color(sc, sc, mc);
+                    auto c = rerun::Color(70, 70, 120);
                     rec->log_static("/swath" + std::to_string(i) + "_" + std::to_string(j),
-                                    rerun::LineStrips3D(rerun::components::LineStrip3D(swaths[j]))
+                                    rerun::LineStrips3D(rerun::components::LineStrip3D(pts))
                                         .with_colors({{c}})
                                         .with_radii({{0.2f}}));
                 }
@@ -69,13 +55,13 @@ namespace farmtrax {
         }
 
         /**
-         * @brief Visualize a DivisionResult by coloring each machine’s assignments.
+         * @brief Visualize a Divy’s latest division by coloring each machine’s assignments.
          */
-        inline void show_divisions(const DivisionResult &div, std::shared_ptr<rerun::RecordingStream> rec,
-                                   float radius = 0.2f) {
+        inline void show_divisions(const Divy &divy, std::shared_ptr<rerun::RecordingStream> rec, float radius = 0.2f) {
             static const std::vector<rerun::Color> palette = {{255, 0, 0},   {0, 255, 0},   {0, 0, 255},
                                                               {255, 255, 0}, {0, 255, 255}, {255, 0, 255}};
 
+            const auto &div = divy.result();
             for (auto const &kv : div.headlands_per_machine) {
                 size_t m = kv.first;
                 auto const &headlands = kv.second;
