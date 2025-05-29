@@ -83,6 +83,7 @@ export(EXPORT ${project_name}Targets
 
 # --------------------------------------------------------------------------------------------------
 if(FARMTRAX_BUILD_EXAMPLES)
+  add_definitions(-DHAS_RERUN)
   set(RERUN_DOWNLOAD_AND_BUILD_ARROW OFF)
   FetchContent_Declare(rerun_sdk URL https://github.com/rerun-io/rerun/releases/latest/download/rerun_cpp_sdk.zip)
   FetchContent_MakeAvailable(rerun_sdk)
