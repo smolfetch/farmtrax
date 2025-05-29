@@ -45,37 +45,36 @@ int main() {
     farmtrax::Field field(poly, 0.1, datum, true, 0.5);
     field.add_noise();
 
-    geotiv::Layer layer;
-    layer.grid = field.get_grid(0);
-    layer.samplesPerPixel = 1;
-    layer.planarConfig = 1;
-    geotiv::RasterCollection rc;
-    rc.crs = concord::CRS::WGS;
-    rc.datum = concord::Datum();
-    rc.heading = concord::Euler{0.0, 0.0, 0.0};
-    rc.resolution = 0.1;
-    rc.layers.push_back(layer);
-
-    std::filesystem::path outPath = "output.tif";
-    geotiv::WriteRasterCollection(rc, outPath);
+    // geotiv::Layer layer;
+    // layer.grid = field.get_grid(0);
+    // layer.samplesPerPixel = 1;
+    // layer.planarConfig = 1;
+    // geotiv::RasterCollection rc;
+    // rc.crs = concord::CRS::WGS;
+    // rc.datum = concord::Datum();
+    // rc.heading = concord::Euler{0.0, 0.0, 0.0};
+    // rc.resolution = 0.1;
+    // rc.layers.push_back(layer);
+    //
+    // std::filesystem::path outPath = "output.tif";
+    // geotiv::WriteRasterCollection(rc, outPath);
 
     field.gen_field(4.0, 0.0, 3);
 
     auto part_cnt = field.get_parts().size();
     std::cout << "Part count: " << part_cnt << "\n";
 
-    /// VISUALS
     farmtrax::visualize::show_field(field, rec);
     std::this_thread::sleep_for(std::chrono::seconds(10));
 
     auto fieldPtr = std::make_shared<farmtrax::Field>(field);
-    farmtrax::Divy divy(fieldPtr, farmtrax::DivisionType::STRIP, 4);
+    farmtrax::Divy divy(fieldPtr, farmtrax::DivisionType::LENGTH_BALANCED, 2);
 
     farmtrax::visualize::show_divisions(divy, rec);
 
     std::this_thread::sleep_for(std::chrono::seconds(10));
 
-    divy.set_machine_count(3);
+    divy.set_machine_count(4);
 
     farmtrax::visualize::show_divisions(divy, rec);
 
