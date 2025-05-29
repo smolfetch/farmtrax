@@ -3,6 +3,7 @@
 #ifdef HAS_RERUN
 
 // #include "concord/types_polygon.hpp"
+#include "../divy.hpp"
 #include "../field.hpp"
 #include "geoson/parser.hpp"
 #include "geoson/writter.hpp"
@@ -82,7 +83,43 @@ namespace farmtrax {
                 }
             }
         }
+        inline void show_divisions(const DivisionResult &div, std::shared_ptr<rerun::RecordingStream> rec,
+                                   float radius = 0.2f) {
+            static const std::vector<rerun::Color> palette = {{255, 0, 0},   {0, 255, 0},   {0, 0, 255},
+                                                              {255, 255, 0}, {0, 255, 255}, {255, 0, 255}};
+
+            size_t machine_count = div.headlands_per_machine.size();
+
+            for (size_t m = 0; m < machine_count; ++m) {
+                const rerun::Color &color = palette[m % palette.size()];
+
+                // Headlands for machine m
+                for (size_t j = 0; j < div.headlands_per_machine[m].size(); ++j) {
+                    const auto &ring = div.headlands_per_machine[m][j];
+                    std::vector<std::array<float, 3>> pts;
+                    for (auto const &p : ring.polygon.getPoints()) {
+                        pts.push_back({{float(p.enu.x), float(p.enu.y), 0.0f}});
+                    }
+                    auto ls = rerun::components::LineStrip3D(pts);
+                    rec->log_static("/division/headland" + std::to_string(m) + "_" + std::to_string(j),
+                                    rerun::LineStrips3D(ls).with_colors({{color}}).with_radii({{radius}}));
+                }
+
+                // Swaths for machine m
+                for (size_t j = 0; j < div.swaths_per_machine[m].size(); ++j) {
+                    const auto &sw = div.swaths_per_machine[m][j];
+                    std::vector<std::array<float, 3>> pts = {
+                        {{float(sw.line.getStart().enu.x), float(sw.line.getStart().enu.y), 0.0f},
+                         {float(sw.line.getEnd().enu.x), float(sw.line.getEnd().enu.y), 0.0f}}};
+                    auto ls = rerun::components::LineStrip3D(pts);
+                    rec->log_static("/division/swath" + std::to_string(m) + "_" + std::to_string(j),
+                                    rerun::LineStrips3D(ls).with_colors({{color}}).with_radii({{radius}}));
+                }
+            }
+        }
+
     } // namespace visualize
 } // namespace farmtrax
-  //
+
+//
 #endif

@@ -52,7 +52,7 @@ namespace farmtrax {
     struct Ring {
         concord::Polygon polygon;
         std::string uuid;
-        bool finished;
+        bool finished = false;
         BPolygon b_polygon;
         BBox bounding_box; // Add bounding box for R-tree
     };
@@ -60,7 +60,7 @@ namespace farmtrax {
     inline Ring create_ring(const concord::Polygon &poly, std::string uuid = "") {
         if (uuid.empty())
             uuid = boost::uuids::to_string(boost::uuids::random_generator()());
-        Ring ring = {poly, uuid, false};
+        Ring ring = {poly, uuid};
         // Convert to boost polygon and compute bounding box
         ring.b_polygon = boost::geometry::model::polygon<BPoint>();
         for (auto const &pt : poly.getPoints()) {
@@ -76,7 +76,7 @@ namespace farmtrax {
     struct Swath {
         concord::Line line;
         std::string uuid;
-        bool finished;
+        bool finished = false;
         BLineString b_line;
         BBox bounding_box; // Add bounding box for R-tree
     };
@@ -88,7 +88,7 @@ namespace farmtrax {
         if (uuid.empty())
             uuid = boost::uuids::to_string(boost::uuids::random_generator()());
 
-        Swath swath = {L, uuid, false};
+        Swath swath = {L, uuid};
         // Convert to boost linestring and compute bounding box
         swath.b_line.emplace_back(start.enu.x, start.enu.y);
         swath.b_line.emplace_back(end.enu.x, end.enu.y);
