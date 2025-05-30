@@ -11,6 +11,7 @@
 
 #include "farmtrax/divy.hpp"
 #include "farmtrax/field.hpp"
+#include "farmtrax/graph.hpp"
 #include "rerun.hpp"
 
 #include "farmtrax/utils/visualize.hpp"
@@ -60,6 +61,7 @@ int main() {
     // geotiv::WriteRasterCollection(rc, outPath);
 
     field.gen_field(4.0, 0.0, 3);
+    auto num_machines = 2;
 
     auto part_cnt = field.get_parts().size();
     std::cout << "Part count: " << part_cnt << "\n";
@@ -68,15 +70,25 @@ int main() {
     std::this_thread::sleep_for(std::chrono::seconds(10));
 
     auto fieldPtr = std::make_shared<farmtrax::Field>(field);
-    farmtrax::Divy divy(fieldPtr, farmtrax::DivisionType::LENGTH_BALANCED, 2);
+    farmtrax::Divy divy(fieldPtr, farmtrax::DivisionType::ALTERNATE, num_machines);
 
     farmtrax::visualize::show_divisions(divy, rec);
 
     std::this_thread::sleep_for(std::chrono::seconds(10));
 
-    divy.set_machine_count(4);
+    num_machines = 4;
+    divy.set_machine_count(num_machines);
 
     farmtrax::visualize::show_divisions(divy, rec);
+
+    auto &res = divy.result();
+    for (std::size_t m = 0; m < num_machines; ++m) {
+        farmtrax::SwathNetwork net(res.swaths_per_machine.at(m), /*k=*/8, /*max_dist=*/100.0);
+        auto path = net.shortest_path();
+
+        std::cout << "Machine " << m << " path has " << path.size() << " vertices\n";
+        // … convert vertex descriptors back to ENU coords or swath indices …
+    }
 
     return 0;
 }
