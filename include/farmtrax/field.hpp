@@ -25,12 +25,10 @@
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
 
-#include <concord/types_basic.hpp>
-#include <concord/types_grid.hpp>
-#include <concord/types_line.hpp>
-#include <concord/types_polygon.hpp>
+#include <concord/concord.hpp>
 #include <entropy/noisegen.hpp>
 
+#include "farmtrax/party.hpp"
 #include "farmtrax/utils/utils.hpp"
 
 namespace farmtrax {
@@ -139,6 +137,7 @@ namespace farmtrax {
         double resolution_{};
 
       private:
+        Partitioner partitioner_;
         concord::Datum datum_{};
         entropy::NoiseGen noiseGen_;
         std::mt19937 rnd_;
@@ -149,7 +148,8 @@ namespace farmtrax {
               double overlap_threshold = 0.7, double area_threshold = 0.5)
             : resolution_(resolution), border_(border), datum_(datum), overlap_threshold_(overlap_threshold) {
             grids_.emplace_back(border_, resolution_, datum_, centred);
-            auto divisions = border.split_obb(overlap_threshold_);
+            partitioner_ = Partitioner(border_);
+            auto divisions = partitioner_.partition(area_threshold);
             std::cout << "Split " << divisions.size() << " parts\n";
             parts_.reserve(divisions.size());
             for (auto const &poly : divisions) {

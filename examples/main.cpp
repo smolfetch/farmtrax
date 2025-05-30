@@ -1,11 +1,9 @@
 #include <iostream>
 #include <thread>
 
-#include "concord/types_polygon.hpp"
-#include "geoson/parser.hpp"
-#include "geoson/writter.hpp"
-#include "geotiv/parse.hpp"
-#include "geotiv/writter.hpp"
+#include "concord/concord.hpp"
+#include "geoson/geoson.hpp"
+#include "geotiv/geotiv.hpp"
 
 #include "rerun/recording_stream.hpp"
 
@@ -90,10 +88,10 @@ int main() {
 
         // Convert swaths to AB lines for Nety class
         std::vector<std::pair<concord::Point, concord::Point>> ab_pairs;
-        for (const auto& swath : res.swaths_per_machine.at(m)) {
+        for (const auto &swath : res.swaths_per_machine.at(m)) {
             ab_pairs.emplace_back(swath->line.getStart(), swath->line.getEnd());
         }
-        
+
         farmtrax::Nety nety(ab_pairs);
 
         // Use the start point of the first swath as the starting point for this machine
