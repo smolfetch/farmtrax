@@ -1,7 +1,7 @@
 #pragma once
 
 #include "farmtrax/field.hpp"
-#include <algorithm>
+#include "farmtrax/utils/utils.hpp"
 #include <boost/geometry/index/rtree.hpp>
 #include <boost/graph/adjacency_list.hpp>
 #include <boost/graph/dijkstra_shortest_paths.hpp>
@@ -12,11 +12,11 @@
 
 namespace farmtrax {
 
-    using VertexProps = boost::property<boost::vertex_name_t, BPoint>;
+    using VertexProps = boost::property<boost::vertex_name_t, farmtrax::BPoint>;
     using EdgeProps = boost::property<boost::edge_weight_t, double>;
     using Graph = boost::adjacency_list<boost::listS, boost::vecS, boost::undirectedS, VertexProps, EdgeProps>;
     using Vertex = Graph::vertex_descriptor;
-    using PointRTreeValue = std::pair<BPoint, std::size_t>;
+    using PointRTreeValue = std::pair<farmtrax::BPoint, std::size_t>;
     using EndpointTree = boost::geometry::index::rtree<PointRTreeValue, boost::geometry::index::quadratic<16>>;
 
     class SwathNetwork {
@@ -36,7 +36,7 @@ namespace farmtrax {
             build_all();
         }
 
-        std::vector<Vertex> shortest_path() const {
+        std::vector<Vertex> greedy_tour() const {
             double sx = 0, sy = 0;
             std::size_t cnt = 0;
             for (auto const &pr : endpoint_tree_) {
@@ -44,13 +44,32 @@ namespace farmtrax {
                 sy += pr.first.y();
                 ++cnt;
             }
-            BPoint center{sx / cnt, sy / cnt};
+            farmtrax::BPoint center{sx / cnt, sy / cnt};
             return greedy_cover(center);
         }
 
-        std::vector<Vertex> shortest_path(const BPoint &start) const { return greedy_cover(start); }
+        std::vector<Vertex> greedy_tour(const farmtrax::BPoint &start) const { 
+            return greedy_cover(start); 
+        }
 
-        std::vector<Vertex> shortest_path(const BPoint &start, const BPoint &goal) const {
+        // Overload to accept concord::Point
+        std::vector<Vertex> greedy_tour(const concord::Point &start) const {
+            return greedy_cover(farmtrax::utils::to_boost(start));
+        }
+
+        // Improved TSP solver using 2-opt local search
+        std::vector<Vertex> optimized_tour(const farmtrax::BPoint &start) const {
+            auto tour = greedy_cover(start);
+            return two_opt_improve(tour);
+        }
+
+        // Overload to accept concord::Point
+        std::vector<Vertex> optimized_tour(const concord::Point &start) const {
+            auto tour = greedy_cover(farmtrax::utils::to_boost(start));
+            return two_opt_improve(tour);
+        }
+
+        std::vector<Vertex> shortest_path(const farmtrax::BPoint &start, const farmtrax::BPoint &goal) const {
             std::vector<PointRTreeValue> ns, ng;
             endpoint_tree_.query(boost::geometry::index::nearest(start, 1), std::back_inserter(ns));
             endpoint_tree_.query(boost::geometry::index::nearest(goal, 1), std::back_inserter(ng));
@@ -119,7 +138,7 @@ namespace farmtrax {
             }
         }
 
-        std::vector<Vertex> greedy_cover(BPoint cur) const {
+        std::vector<Vertex> greedy_cover(farmtrax::BPoint cur) const {
             std::size_t N = swaths_.size();
             std::vector<bool> used(N, false);
             std::vector<Vertex> seq;
@@ -153,6 +172,31 @@ namespace farmtrax {
                 cur = rev ? swaths_[bi]->b_line.front() : swaths_[bi]->b_line.back();
             }
             return seq;
+        }
+
+        std::vector<Vertex> two_opt_improve(std::vector<Vertex> tour) const {
+            bool improved = true;
+            std::size_t n = tour.size();
+            while (improved) {
+                improved = false;
+                for (std::size_t i = 1; i < n - 1; ++i) {
+                    for (std::size_t j = i + 1; j < n; ++j) {
+                        double delta = calculate_distance(tour[i - 1], tour[i]) + calculate_distance(tour[j], tour[(j + 1) % n])
+                                       - calculate_distance(tour[i - 1], tour[j]) - calculate_distance(tour[i], tour[(j + 1) % n]);
+                        if (delta < 0) {
+                            std::reverse(tour.begin() + i, tour.begin() + j + 1);
+                            improved = true;
+                        }
+                    }
+                }
+            }
+            return tour;
+        }
+
+        double calculate_distance(Vertex u, Vertex v) const {
+            auto pu = boost::get(boost::vertex_name, g_)[u];
+            auto pv = boost::get(boost::vertex_name, g_)[v];
+            return boost::geometry::distance(pu, pv);
         }
     };
 

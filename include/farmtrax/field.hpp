@@ -298,46 +298,6 @@ namespace farmtrax {
         }
 
       private:
-        BPoint to_boost(const concord::Point &in) const { return BPoint{in.enu.x, in.enu.y}; }
-
-        concord::Point from_boost(const BPoint &in) const {
-            concord::ENU pt{in.x(), in.y(), 0.0};
-            return concord::Point{pt, datum_};
-        }
-
-        BLineString to_boost(const concord::Line &L) const {
-            BLineString out;
-            out.emplace_back(to_boost(L.getStart()));
-            out.emplace_back(to_boost(L.getEnd()));
-            return out;
-        }
-
-        concord::Line from_boost(const BLineString &L) const {
-            concord::Line out;
-            out.setStart(from_boost(L.front()));
-            out.setEnd(from_boost(L.back()));
-            return out;
-        }
-
-        BPolygon to_boost(const concord::Polygon &poly) const {
-            BPolygon out;
-            for (auto const &pt : poly.getPoints())
-                out.outer().emplace_back(to_boost(pt));
-            if (!boost::geometry::equals(out.outer().front(), out.outer().back()))
-                out.outer().push_back(out.outer().front());
-            boost::geometry::correct(out);
-            return out;
-        }
-
-        concord::Polygon from_boost(const BPolygon &poly) const {
-            concord::Polygon out;
-            for (auto const &pt : poly.outer())
-                out.addPoint(from_boost(pt));
-            if (!out.getPoints().empty())
-                out.addPoint(from_boost(poly.outer().front()));
-            return out;
-        }
-
         std::vector<Ring> generate_headlands(const concord::Polygon &polygon, double shrink_dist, int count) const {
             if (shrink_dist <= 0 || count <= 0)
                 return {};
@@ -345,10 +305,10 @@ namespace farmtrax {
                 throw std::invalid_argument("negative shrink");
 
             std::vector<Ring> H;
-            BPolygon base = to_boost(polygon);
+            BPolygon base = utils::to_boost(polygon);
 
             for (int i = 0; i < count; ++i) {
-                BPolygon current = (i == 0 ? base : to_boost(H.back().polygon));
+                BPolygon current = (i == 0 ? base : utils::to_boost(H.back().polygon));
                 boost::geometry::model::multi_polygon<BPolygon> buf;
                 boost::geometry::strategy::buffer::distance_symmetric<double> dist(-shrink_dist);
                 boost::geometry::strategy::buffer::side_straight side;
@@ -383,7 +343,7 @@ namespace farmtrax {
                     break;
                 }
 
-                concord::Polygon tmp = from_boost(*best);
+                concord::Polygon tmp = utils::from_boost(*best, datum_);
                 concord::Polygon simp = utils::remove_colinear_points(tmp, 1e-4);
                 simp.addPoint(simp.getPoints().front());
 
@@ -407,7 +367,7 @@ namespace farmtrax {
             }
 
             std::vector<Swath> out;
-            BPolygon bounds = to_boost(border);
+            BPolygon bounds = utils::to_boost(border);
             double rad = angle_deg * M_PI / 180.0;
             BPoint centroid;
             boost::geometry::centroid(bounds, centroid);

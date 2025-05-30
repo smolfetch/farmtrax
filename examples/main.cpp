@@ -83,8 +83,18 @@ int main() {
 
     auto &res = divy.result();
     for (std::size_t m = 0; m < num_machines; ++m) {
+        if (res.swaths_per_machine.at(m).empty()) {
+            std::cout << "Machine " << m << " has no swaths assigned\n";
+            continue;
+        }
+
         farmtrax::SwathNetwork net(res.swaths_per_machine.at(m), /*k=*/8, /*max_dist=*/100.0);
-        auto path = net.shortest_path();
+
+        // Use the start point of the first swath as the starting point for this machine
+        auto first_swath = res.swaths_per_machine.at(m)[0];
+        concord::Point start_point = first_swath->line.getStart();
+
+        auto path = net.optimized_tour(start_point);
 
         std::cout << "Machine " << m << " path has " << path.size() << " vertices\n";
         // … convert vertex descriptors back to ENU coords or swath indices …
