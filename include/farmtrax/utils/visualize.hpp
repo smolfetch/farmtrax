@@ -83,46 +83,9 @@ namespace farmtrax {
             }
         }
 
-        inline void show_optimized_path(const farmtrax::SwathNetwork &network, 
-                                      const std::vector<farmtrax::Vertex> &path,
-                                      std::shared_ptr<rerun::RecordingStream> rec, 
-                                      size_t machine_id = 0,
-                                      float radius = 0.3f) {
-            static const std::vector<rerun::Color> palette = {{255, 0, 0},   {0, 255, 0},   {0, 0, 255},
-                                                              {255, 255, 0}, {0, 255, 255}, {255, 0, 255}};
-            
-            auto color = palette[machine_id % palette.size()];
-            
-            // Get vertex positions from the graph
-            auto get_vertex_position = [&](farmtrax::Vertex v) -> std::array<float, 3> {
-                auto pos = boost::get(boost::vertex_name, network.get_graph())[v];
-                return {float(pos.x()), float(pos.y()), 0.2f};
-            };
-            
-            // Visualize the path as a connected line
-            std::vector<std::array<float, 3>> path_points;
-            for (const auto& vertex : path) {
-                path_points.push_back(get_vertex_position(vertex));
-            }
-            
-            if (!path_points.empty()) {
-                rec->log_static("/optimized_path/machine" + std::to_string(machine_id),
-                              rerun::LineStrips3D(rerun::components::LineStrip3D(path_points))
-                                  .with_colors({{color}})
-                                  .with_radii({{radius}}));
-            }
-            
-            // Visualize individual vertices as points
-            for (size_t i = 0; i < path.size(); ++i) {
-                auto pos = get_vertex_position(path[i]);
-                rec->log_static("/optimized_path/vertex" + std::to_string(machine_id) + "_" + std::to_string(i),
-                              rerun::Points3D({{pos[0], pos[1], pos[2]}})
-                                  .with_colors({{color}})
-                                  .with_radii({{radius * 1.5f}}));
-            }
-        }
 
-        inline void show_swath_tour(const farmtrax::SwathNetwork &network, 
+        // Overloaded version for Nety class
+        inline void show_swath_tour(const farmtrax::Nety &nety, 
                                    const std::vector<farmtrax::Vertex> &path,
                                    std::shared_ptr<rerun::RecordingStream> rec, 
                                    size_t machine_id = 0,
@@ -134,8 +97,8 @@ namespace farmtrax {
             auto base_color = palette[machine_id % palette.size()];
             auto connection_color = rerun::Color(base_color.r() * 0.6, base_color.g() * 0.6, base_color.b() * 0.6);
             
-            const auto& swaths = network.get_swaths();
-            const auto& graph = network.get_graph();
+            const auto& ab_lines = nety.get_ab_lines();
+            const auto& graph = nety.get_graph();
             
             // Helper to get vertex position
             auto get_vertex_position = [&](farmtrax::Vertex v) -> std::array<float, 3> {
@@ -143,44 +106,42 @@ namespace farmtrax {
                 return {float(pos.x()), float(pos.y()), 0.3f};
             };
             
-            // Helper to find which swath a vertex belongs to and whether it's start or end
-            auto get_swath_info = [&](farmtrax::Vertex v) -> std::pair<size_t, bool> {
+            // Helper to find which AB line a vertex belongs to and whether it's A or B endpoint
+            auto get_ab_line_info = [&](farmtrax::Vertex v) -> std::pair<size_t, bool> {
                 auto pos = boost::get(boost::vertex_name, graph)[v];
-                for (size_t i = 0; i < swaths.size(); ++i) {
-                    auto start_pos = swaths[i]->b_line.front();
-                    auto end_pos = swaths[i]->b_line.back();
+                for (size_t i = 0; i < ab_lines.size(); ++i) {
                     const double eps = 1e-6;
-                    if (boost::geometry::distance(pos, start_pos) < eps) {
-                        return {i, true}; // start of swath i
+                    if (boost::geometry::distance(pos, ab_lines[i].A) < eps) {
+                        return {i, true}; // A endpoint of line i
                     }
-                    if (boost::geometry::distance(pos, end_pos) < eps) {
-                        return {i, false}; // end of swath i
+                    if (boost::geometry::distance(pos, ab_lines[i].B) < eps) {
+                        return {i, false}; // B endpoint of line i
                     }
                 }
                 return {SIZE_MAX, false}; // not found
             };
             
-            // Track which swaths are used and in what order
-            std::vector<bool> swath_used(swaths.size(), false);
+            // Track which AB lines are used and in what order
+            std::vector<bool> line_used(ab_lines.size(), false);
             std::vector<std::array<float, 3>> tour_points;
             
-            // Process the path to visualize swaths and connections
+            // Process the path to visualize AB lines and connections
             for (size_t i = 0; i < path.size(); ++i) {
-                auto [swath_idx, is_start] = get_swath_info(path[i]);
+                auto [line_idx, is_A] = get_ab_line_info(path[i]);
                 
-                if (swath_idx != SIZE_MAX && !swath_used[swath_idx]) {
-                    // Mark this swath as used
-                    swath_used[swath_idx] = true;
+                if (line_idx != SIZE_MAX && !line_used[line_idx]) {
+                    // Mark this AB line as used
+                    line_used[line_idx] = true;
                     
-                    // Visualize the swath itself
-                    const auto& swath = swaths[swath_idx];
-                    std::vector<std::array<float, 3>> swath_points = {
-                        {float(swath->line.getStart().enu.x), float(swath->line.getStart().enu.y), 0.3f},
-                        {float(swath->line.getEnd().enu.x), float(swath->line.getEnd().enu.y), 0.3f}
+                    // Visualize the AB line itself
+                    const auto& ab_line = ab_lines[line_idx];
+                    std::vector<std::array<float, 3>> line_points = {
+                        {float(ab_line.A.x()), float(ab_line.A.y()), 0.3f},
+                        {float(ab_line.B.x()), float(ab_line.B.y()), 0.3f}
                     };
                     
-                    rec->log_static("/tour/machine" + std::to_string(machine_id) + "/swath" + std::to_string(swath_idx),
-                                  rerun::LineStrips3D(rerun::components::LineStrip3D(swath_points))
+                    rec->log_static("/tour/machine" + std::to_string(machine_id) + "/ab_line" + std::to_string(line_idx),
+                                  rerun::LineStrips3D(rerun::components::LineStrip3D(line_points))
                                       .with_colors({{base_color}})
                                       .with_radii({{swath_radius}}));
                 }
@@ -189,13 +150,13 @@ namespace farmtrax {
                 tour_points.push_back(get_vertex_position(path[i]));
             }
             
-            // Visualize connection lines between different swaths only
+            // Visualize connection lines between different AB lines only
             for (size_t i = 0; i < path.size() - 1; ++i) {
-                auto [swath_idx1, is_start1] = get_swath_info(path[i]);
-                auto [swath_idx2, is_start2] = get_swath_info(path[i + 1]);
+                auto [line_idx1, is_A1] = get_ab_line_info(path[i]);
+                auto [line_idx2, is_A2] = get_ab_line_info(path[i + 1]);
                 
-                // Only draw connection if vertices belong to different swaths
-                if (swath_idx1 != swath_idx2 && swath_idx1 != SIZE_MAX && swath_idx2 != SIZE_MAX) {
+                // Only draw connection if vertices belong to different AB lines
+                if (line_idx1 != line_idx2 && line_idx1 != SIZE_MAX && line_idx2 != SIZE_MAX) {
                     std::vector<std::array<float, 3>> connection_segment = {
                         get_vertex_position(path[i]),
                         get_vertex_position(path[i + 1])

@@ -88,18 +88,24 @@ int main() {
             continue;
         }
 
-        farmtrax::SwathNetwork net(res.swaths_per_machine.at(m), /*k=*/8, /*max_dist=*/100.0);
+        // Convert swaths to AB lines for Nety class
+        std::vector<std::pair<concord::Point, concord::Point>> ab_pairs;
+        for (const auto& swath : res.swaths_per_machine.at(m)) {
+            ab_pairs.emplace_back(swath->line.getStart(), swath->line.getEnd());
+        }
+        
+        farmtrax::Nety nety(ab_pairs);
 
         // Use the start point of the first swath as the starting point for this machine
         auto first_swath = res.swaths_per_machine.at(m)[0];
         concord::Point start_point = first_swath->line.getStart();
 
-        auto path = net.optimized_tour(start_point);
+        auto path = nety.field_traversal(start_point);
 
         std::cout << "Machine " << m << " path has " << path.size() << " vertices\n";
 
         // Visualize the optimized swath tour with connections
-        farmtrax::visualize::show_swath_tour(net, path, rec, m);
+        farmtrax::visualize::show_swath_tour(nety, path, rec, m);
 
         // … convert vertex descriptors back to ENU coords or swath indices …
     }
