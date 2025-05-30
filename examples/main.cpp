@@ -72,14 +72,14 @@ int main() {
     auto fieldPtr = std::make_shared<farmtrax::Field>(field);
     farmtrax::Divy divy(fieldPtr, farmtrax::DivisionType::ALTERNATE, num_machines);
 
-    farmtrax::visualize::show_divisions(divy, rec);
+    // farmtrax::visualize::show_divisions(divy, rec);
 
     std::this_thread::sleep_for(std::chrono::seconds(10));
 
     num_machines = 4;
     divy.set_machine_count(num_machines);
 
-    farmtrax::visualize::show_divisions(divy, rec);
+    // farmtrax::visualize::show_divisions(divy, rec);
 
     auto &res = divy.result();
     for (std::size_t m = 0; m < num_machines; ++m) {
@@ -97,6 +97,10 @@ int main() {
         auto path = net.optimized_tour(start_point);
 
         std::cout << "Machine " << m << " path has " << path.size() << " vertices\n";
+
+        // Visualize the optimized swath tour with connections
+        farmtrax::visualize::show_swath_tour(net, path, rec, m);
+
         // … convert vertex descriptors back to ENU coords or swath indices …
     }
 

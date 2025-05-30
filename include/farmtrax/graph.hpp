@@ -48,9 +48,7 @@ namespace farmtrax {
             return greedy_cover(center);
         }
 
-        std::vector<Vertex> greedy_tour(const farmtrax::BPoint &start) const { 
-            return greedy_cover(start); 
-        }
+        std::vector<Vertex> greedy_tour(const farmtrax::BPoint &start) const { return greedy_cover(start); }
 
         // Overload to accept concord::Point
         std::vector<Vertex> greedy_tour(const concord::Point &start) const {
@@ -88,6 +86,40 @@ namespace farmtrax {
             }
             std::reverse(path.begin(), path.end());
             return path;
+        }
+
+        // Public access to graph for visualization
+        const Graph& get_graph() const { return g_; }
+        const std::vector<std::shared_ptr<const Swath>>& get_swaths() const { return swaths_; }
+
+        // Extract swath sequence from vertex path
+        std::vector<size_t> get_swath_sequence(const std::vector<Vertex> &path) const {
+            std::vector<size_t> sequence;
+            std::vector<bool> visited(swaths_.size(), false);
+            
+            auto get_swath_index = [&](Vertex v) -> size_t {
+                auto pos = boost::get(boost::vertex_name, g_)[v];
+                for (size_t i = 0; i < swaths_.size(); ++i) {
+                    auto start_pos = swaths_[i]->b_line.front();
+                    auto end_pos = swaths_[i]->b_line.back();
+                    const double eps = 1e-6;
+                    if (boost::geometry::distance(pos, start_pos) < eps || 
+                        boost::geometry::distance(pos, end_pos) < eps) {
+                        return i;
+                    }
+                }
+                return SIZE_MAX;
+            };
+            
+            for (const auto& vertex : path) {
+                size_t swath_idx = get_swath_index(vertex);
+                if (swath_idx != SIZE_MAX && !visited[swath_idx]) {
+                    sequence.push_back(swath_idx);
+                    visited[swath_idx] = true;
+                }
+            }
+            
+            return sequence;
         }
 
       private:
@@ -181,8 +213,9 @@ namespace farmtrax {
                 improved = false;
                 for (std::size_t i = 1; i < n - 1; ++i) {
                     for (std::size_t j = i + 1; j < n; ++j) {
-                        double delta = calculate_distance(tour[i - 1], tour[i]) + calculate_distance(tour[j], tour[(j + 1) % n])
-                                       - calculate_distance(tour[i - 1], tour[j]) - calculate_distance(tour[i], tour[(j + 1) % n]);
+                        double delta =
+                            calculate_distance(tour[i - 1], tour[i]) + calculate_distance(tour[j], tour[(j + 1) % n]) -
+                            calculate_distance(tour[i - 1], tour[j]) - calculate_distance(tour[i], tour[(j + 1) % n]);
                         if (delta < 0) {
                             std::reverse(tour.begin() + i, tour.begin() + j + 1);
                             improved = true;
