@@ -72,38 +72,37 @@ namespace farmtrax {
     }
 
     enum class SwathType {
-        Sath,
-        Turn,
-        Head,
+        Swath,
+        Connection,
+        Headland,
     };
 
     struct Swath {
         concord::Line line;
         std::string uuid;
+        SwathType type; // Default type is Sath
         bool finished = false;
-        SwathType type = SwathType::Sath; // Default type is Sath
         BLineString b_line;
         BBox bounding_box; // Add bounding box for R-tree
-        
+
         // Get the head (start) point
         concord::Point getHead() const { return line.getStart(); }
-        
-        // Get the tail (end) point  
+
+        // Get the tail (end) point
         concord::Point getTail() const { return line.getEnd(); }
-        
+
         // Swap head and tail (reverse direction)
         void swapDirection() {
             concord::Point temp = line.getStart();
             line.setStart(line.getEnd());
             line.setEnd(temp);
-            
             // Update boost linestring and bounding box
             b_line.clear();
             b_line.emplace_back(line.getStart().enu.x, line.getStart().enu.y);
             b_line.emplace_back(line.getEnd().enu.x, line.getEnd().enu.y);
             bounding_box = boost::geometry::return_envelope<BBox>(b_line);
         }
-        
+
         // Create a copy with swapped direction
         Swath withSwappedDirection() const {
             Swath swapped = *this;
@@ -112,14 +111,15 @@ namespace farmtrax {
         }
     };
 
-    inline Swath create_swath(const concord::Point &start, const concord::Point &end, std::string uuid = "") {
+    inline Swath create_swath(const concord::Point &start, const concord::Point &end, SwathType type,
+                              std::string uuid = "") {
         concord::Line L;
         L.setStart(start);
         L.setEnd(end);
         if (uuid.empty())
             uuid = boost::uuids::to_string(boost::uuids::random_generator()());
 
-        Swath swath = {L, uuid};
+        Swath swath = {L, uuid, type};
         // Convert to boost linestring and compute bounding box
         swath.b_line.emplace_back(start.enu.x, start.enu.y);
         swath.b_line.emplace_back(end.enu.x, end.enu.y);
@@ -427,7 +427,7 @@ namespace farmtrax {
                         continue;
                     concord::Point a{concord::ENU{seg.front().x(), seg.front().y(), 0}, datum_};
                     concord::Point b{concord::ENU{seg.back().x(), seg.back().y(), 0}, datum_};
-                    out.push_back(create_swath(a, b));
+                    out.push_back(create_swath(a, b, SwathType::Swath));
                 }
             }
 

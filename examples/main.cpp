@@ -71,7 +71,6 @@ int main() {
 
         auto fieldPtr = std::make_shared<farmtrax::Part>(field.get_parts()[f]);
         farmtrax::Divy divy(fieldPtr, farmtrax::DivisionType::ALTERNATE, num_machines);
-        std::cout << "here" << std::endl;
         divy.compute_division();
 
         // farmtrax::visualize::show_divisions(divy, rec);

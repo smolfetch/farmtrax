@@ -75,7 +75,7 @@ namespace farmtrax {
 
         std::vector<std::shared_ptr<const Swath>> all_swaths;
         for (auto &s : part_->swaths)
-            if (!s.finished)
+            if (!s.finished && s.type == SwathType::Swath)
                 all_swaths.emplace_back(part_, &s);
 
         if (division_type_ == DivisionType::SPATIAL_RTREE) {
