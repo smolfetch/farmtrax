@@ -18,51 +18,50 @@ namespace farmtrax {
     class Divy {
       public:
         Divy(std::shared_ptr<Field> field, DivisionType type, std::size_t machines);
+        Divy(std::shared_ptr<Part> part, DivisionType type, std::size_t machines);
         void set_machine_count(std::size_t machines);
         void set_division_type(DivisionType type);
         const DivisionResult &result() const;
+        void compute_division();
 
       private:
-        void recompute();
-
-        std::shared_ptr<Field> field_;
+        std::shared_ptr<Part> part_;
         DivisionType division_type_;
         std::size_t machine_count_;
         DivisionResult division_;
     };
 
-    inline Divy::Divy(std::shared_ptr<Field> field, DivisionType type, std::size_t machines)
-        : field_(std::move(field)), division_type_(type), machine_count_(machines) {
-        if (!field_)
+    inline Divy::Divy(std::shared_ptr<Part> part, DivisionType type, std::size_t machines)
+        : part_(part), division_type_(type), machine_count_(machines) {
+        if (!part)
             throw std::invalid_argument("null field");
         if (machine_count_ == 0)
             throw std::invalid_argument("machine count > 0");
-        recompute();
+        // compute_division();
     }
 
     inline void Divy::set_machine_count(std::size_t machines) {
         if (machines == 0)
             throw std::invalid_argument("machine count > 0");
         machine_count_ = machines;
-        recompute();
+        // compute_division();
     }
 
     inline void Divy::set_division_type(DivisionType type) {
         division_type_ = type;
-        recompute();
+        // compute_division();
     }
 
     inline const DivisionResult &Divy::result() const { return division_; }
 
-    inline void Divy::recompute() {
+    inline void Divy::compute_division() {
         division_.headlands_per_machine.clear();
         division_.swaths_per_machine.clear();
 
         std::vector<std::shared_ptr<const Ring>> all_headlands;
-        for (auto &part : field_->get_parts())
-            for (auto &h : part.headlands)
-                if (!h.finished)
-                    all_headlands.emplace_back(field_, &h);
+        for (auto &h : part_->headlands)
+            if (!h.finished)
+                all_headlands.emplace_back(part_, &h);
 
         std::size_t H = all_headlands.size();
         std::size_t base_h = H / machine_count_;
@@ -75,10 +74,9 @@ namespace farmtrax {
         }
 
         std::vector<std::shared_ptr<const Swath>> all_swaths;
-        for (auto &part : field_->get_parts())
-            for (auto &s : part.swaths)
-                if (!s.finished)
-                    all_swaths.emplace_back(field_, &s);
+        for (auto &s : part_->swaths)
+            if (!s.finished)
+                all_swaths.emplace_back(part_, &s);
 
         if (division_type_ == DivisionType::SPATIAL_RTREE) {
             SwathRTree rtree;

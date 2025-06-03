@@ -65,40 +65,43 @@ int main() {
     std::cout << "Part count: " << part_cnt << "\n";
 
     farmtrax::visualize::show_field(field, rec);
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+    std::this_thread::sleep_for(std::chrono::seconds(2));
 
-    auto fieldPtr = std::make_shared<farmtrax::Field>(field);
-    farmtrax::Divy divy(fieldPtr, farmtrax::DivisionType::ALTERNATE, num_machines);
+    for (size_t f = 0; f < field.get_parts().size(); f++) {
 
-    // farmtrax::visualize::show_divisions(divy, rec);
+        auto fieldPtr = std::make_shared<farmtrax::Part>(field.get_parts()[f]);
+        farmtrax::Divy divy(fieldPtr, farmtrax::DivisionType::ALTERNATE, num_machines);
+        std::cout << "here" << std::endl;
+        divy.compute_division();
 
-    std::this_thread::sleep_for(std::chrono::seconds(10));
+        // farmtrax::visualize::show_divisions(divy, rec);
 
-    num_machines = 4;
-    divy.set_machine_count(num_machines);
+        std::this_thread::sleep_for(std::chrono::seconds(10));
 
-    // farmtrax::visualize::show_divisions(divy, rec);
+        num_machines = 4;
+        divy.set_machine_count(num_machines);
+        divy.compute_division();
 
-    auto &res = divy.result();
-    for (std::size_t m = 0; m < num_machines; ++m) {
-        if (res.swaths_per_machine.at(m).empty()) {
-            std::cout << "Machine " << m << " has no swaths assigned\n";
-            continue;
+        // farmtrax::visualize::show_divisions(divy, rec);
+
+        auto &res = divy.result();
+        for (std::size_t m = 0; m < num_machines; ++m) {
+            if (res.swaths_per_machine.at(m).empty()) {
+                std::cout << "Machine " << m << " has no swaths assigned\n";
+                continue;
+            }
+
+            // Create Nety instance directly from swaths
+            farmtrax::Nety nety(res.swaths_per_machine.at(m));
+            auto path = nety.field_traversal();
+
+            std::cout << "Machine " << m << " path has " << path.size() << " vertices\n";
+
+            // Visualize the optimized swath tour with connections
+            farmtrax::visualize::show_swath_tour(nety, path, rec, m);
+
+            // … convert vertex descriptors back to ENU coords or swath indices …
         }
-
-        // Create Nety instance directly from swaths
-        farmtrax::Nety nety(res.swaths_per_machine.at(m));
-
-        // Use the start point of the first swath as the starting point machine or nothing
-        auto sp = std::make_shared<concord::Point>(res.swaths_per_machine.at(m)[0]->line.getStart());
-        auto path = nety.field_traversal(sp);
-
-        std::cout << "Machine " << m << " path has " << path.size() << " vertices\n";
-
-        // Visualize the optimized swath tour with connections
-        farmtrax::visualize::show_swath_tour(nety, path, rec, m);
-
-        // … convert vertex descriptors back to ENU coords or swath indices …
     }
 
     return 0;
