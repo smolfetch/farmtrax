@@ -31,66 +31,32 @@ namespace farmtrax {
         std::string uuid;
         std::size_t line_id;
 
-        ABLine(const farmtrax::BPoint &a, const farmtrax::BPoint &b, std::string uuid, std::size_t id) : A(a), B(b), uuid(uuid), line_id(id) {}
+        ABLine(const farmtrax::BPoint &a, const farmtrax::BPoint &b, std::string uuid, std::size_t id)
+            : A(a), B(b), uuid(uuid), line_id(id) {}
 
         // Constructor from concord::Point
         ABLine(const concord::Point &a, const concord::Point &b, std::string uuid, std::size_t id)
             : A(utils::to_boost(a)), B(utils::to_boost(b)), uuid(uuid), line_id(id) {}
 
         double length() const { return boost::geometry::distance(A, B); }
+
+        bool equal(const Swath &swath) { return true ? uuid == swath.uuid : false; }
     };
 
     class Nety {
+        std::vector<ABLine> ab_lines_;
+        std::vector<std::shared_ptr<const Swath>> swaths_;
+        Graph graph_;
+        EndpointTree endpoint_tree_;
+        std::vector<Vertex> vertex_A_; // A endpoints for each line
+        std::vector<Vertex> vertex_B_; // B endpoints for each line
+
       public:
-        // Constructor from AB lines (farmtrax::BPoint)
-        explicit Nety(const std::vector<ABLine> &lines) {
-            ab_lines_ = lines;
-            build_graph();
-        }
-
-        // Constructor from vector of point pairs (farmtrax::BPoint)
-        explicit Nety(const std::vector<std::pair<farmtrax::BPoint, farmtrax::BPoint>> &point_pairs, std::string uuid = "") {
-            ab_lines_.reserve(point_pairs.size());
-            for (size_t i = 0; i < point_pairs.size(); ++i) {
-                ab_lines_.emplace_back(point_pairs[i].first, point_pairs[i].second, uuid, i);
-            }
-            build_graph();
-        }
-
-        // Constructor from vector of point pairs (concord::Point)
-        explicit Nety(const std::vector<std::pair<concord::Point, concord::Point>> &point_pairs, std::string uuid = "") {
-            ab_lines_.reserve(point_pairs.size());
-            for (size_t i = 0; i < point_pairs.size(); ++i) {
-                ab_lines_.emplace_back(point_pairs[i].first, point_pairs[i].second, uuid, i);
-            }
-            build_graph();
-        }
-
-        // Constructor from Field
-        Nety(const Field &field, std::size_t part_idx) {
-            const auto &p = field.get_parts()[part_idx];
-            ab_lines_.reserve(p.swaths.size());
-            for (size_t i = 0; i < p.swaths.size(); ++i) {
-                const auto &swath = p.swaths[i];
-                ab_lines_.emplace_back(swath.b_line.front(), swath.b_line.back(), swath.uuid, i);
-            }
-            build_graph();
-        }
-
         // Constructor from vector of Swaths
-        explicit Nety(const std::vector<std::shared_ptr<const Swath>> &swaths) {
+        explicit Nety(const std::vector<std::shared_ptr<const Swath>> &swaths) : swaths_(swaths) {
             ab_lines_.reserve(swaths.size());
             for (size_t i = 0; i < swaths.size(); ++i) {
                 ab_lines_.emplace_back(swaths[i]->line.getStart(), swaths[i]->line.getEnd(), swaths[i]->uuid, i);
-            }
-            build_graph();
-        }
-
-        // Overload for a vector of non-const Swaths
-        explicit Nety(const std::vector<Swath> &swaths) {
-            ab_lines_.reserve(swaths.size());
-            for (size_t i = 0; i < swaths.size(); ++i) {
-                ab_lines_.emplace_back(swaths[i].line.getStart(), swaths[i].line.getEnd(), swaths[i].uuid, i);
             }
             build_graph();
         }
@@ -133,6 +99,8 @@ namespace farmtrax {
 
             return path;
         }
+
+        std::vector<Swath> vertex_to_swaths(std::vector<Vertex> verts) {}
 
         // Overload for concord::Point
         std::vector<Vertex> field_traversal(const concord::Point &start_point) const {
@@ -213,12 +181,6 @@ namespace farmtrax {
         }
 
       private:
-        std::vector<ABLine> ab_lines_;
-        Graph graph_;
-        EndpointTree endpoint_tree_;
-        std::vector<Vertex> vertex_A_; // A endpoints for each line
-        std::vector<Vertex> vertex_B_; // B endpoints for each line
-
         void build_graph() {
             if (ab_lines_.empty())
                 return;
