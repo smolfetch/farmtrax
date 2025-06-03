@@ -77,6 +77,32 @@ namespace farmtrax {
         bool finished = false;
         BLineString b_line;
         BBox bounding_box; // Add bounding box for R-tree
+        
+        // Get the head (start) point
+        concord::Point getHead() const { return line.getStart(); }
+        
+        // Get the tail (end) point  
+        concord::Point getTail() const { return line.getEnd(); }
+        
+        // Swap head and tail (reverse direction)
+        void swapDirection() {
+            concord::Point temp = line.getStart();
+            line.setStart(line.getEnd());
+            line.setEnd(temp);
+            
+            // Update boost linestring and bounding box
+            b_line.clear();
+            b_line.emplace_back(line.getStart().enu.x, line.getStart().enu.y);
+            b_line.emplace_back(line.getEnd().enu.x, line.getEnd().enu.y);
+            bounding_box = boost::geometry::return_envelope<BBox>(b_line);
+        }
+        
+        // Create a copy with swapped direction
+        Swath withSwappedDirection() const {
+            Swath swapped = *this;
+            swapped.swapDirection();
+            return swapped;
+        }
     };
 
     inline Swath create_swath(const concord::Point &start, const concord::Point &end, std::string uuid = "") {

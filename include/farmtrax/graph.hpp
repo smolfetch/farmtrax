@@ -43,9 +43,18 @@ namespace farmtrax {
         bool equal(const Swath &swath) { return true ? uuid == swath.uuid : false; } // TODO: amke this an operator
     };
 
+    // Structure to store swath traversal information
+    struct SwathTraversal {
+        std::shared_ptr<const Swath> swath;
+        bool start_from_A; // true if we traverse from A to B, false if from B to A
+        
+        SwathTraversal(std::shared_ptr<const Swath> s, bool from_A) : swath(s), start_from_A(from_A) {}
+    };
+
     class Nety {
         std::vector<ABLine> ab_lines_;
         std::vector<std::shared_ptr<const Swath>> swaths_;
+        std::vector<SwathTraversal> swath_traversals_; // Ordered traversal with direction info
         Graph graph_;
         EndpointTree endpoint_tree_;
         std::vector<Vertex> vertex_A_; // A endpoints for each line
@@ -68,7 +77,7 @@ namespace farmtrax {
 
             std::vector<Vertex> path;
             std::vector<bool> visited_lines(ab_lines_.size(), false);
-            std::vector<std::size_t> line_order; // Track the order of lines visited
+            swath_traversals_.clear(); // Clear previous traversal info
 
             // Find starting line and endpoint
             auto [current_line_id, current_is_A] = find_closest_endpoint(start_point);
@@ -78,7 +87,9 @@ namespace farmtrax {
             while (true) {
                 // Mark current line as visited
                 visited_lines[current_line_id] = true;
-                line_order.push_back(current_line_id);
+                
+                // Store traversal information with direction
+                swath_traversals_.emplace_back(swaths_[current_line_id], current_is_A);
 
                 // Add both vertices of current line to path (A->B or B->A)
                 Vertex start_vertex = current_is_A ? vertex_A_[current_line_id] : vertex_B_[current_line_id];
@@ -99,8 +110,8 @@ namespace farmtrax {
                 current_is_A = next_is_A;
             }
 
-            // Reorder swaths according to traversal order
-            reorder_swaths(line_order);
+            // Reorder and orient swaths according to traversal
+            reorder_and_orient_swaths();
 
             return path;
         }
@@ -523,25 +534,35 @@ namespace farmtrax {
             return angle < (15.0 * M_PI / 180.0);
         }
 
-        // Reorder swaths according to the traversal order
-        void reorder_swaths(const std::vector<std::size_t> &line_order) {
-            if (line_order.empty() || line_order.size() != swaths_.size())
+        // Reorder and orient swaths according to the traversal order with direction info
+        void reorder_and_orient_swaths() {
+            if (swath_traversals_.empty())
                 return;
 
             std::vector<std::shared_ptr<const Swath>> reordered_swaths;
             std::vector<ABLine> reordered_ab_lines;
             
-            reordered_swaths.reserve(swaths_.size());
-            reordered_ab_lines.reserve(ab_lines_.size());
+            reordered_swaths.reserve(swath_traversals_.size());
+            reordered_ab_lines.reserve(swath_traversals_.size());
 
-            // Reorder both swaths and ab_lines according to traversal order
-            for (std::size_t i = 0; i < line_order.size(); ++i) {
-                std::size_t original_index = line_order[i];
-                reordered_swaths.push_back(swaths_[original_index]);
+            // Reorder and orient swaths according to traversal order
+            for (std::size_t i = 0; i < swath_traversals_.size(); ++i) {
+                const auto& traversal = swath_traversals_[i];
+                std::shared_ptr<const Swath> swath = traversal.swath;
                 
-                // Update line_id to reflect new position
-                ABLine reordered_line = ab_lines_[original_index];
-                reordered_line.line_id = i;
+                // Create a mutable copy to potentially modify direction
+                auto mutable_swath = std::make_shared<Swath>(*swath);
+                
+                // If we need to traverse from B to A (not start_from_A), swap the direction
+                if (!traversal.start_from_A) {
+                    mutable_swath->swapDirection();
+                }
+                
+                reordered_swaths.push_back(mutable_swath);
+                
+                // Create corresponding AB line with new orientation
+                ABLine reordered_line(mutable_swath->line.getStart(), mutable_swath->line.getEnd(), 
+                                    mutable_swath->uuid, i);
                 reordered_ab_lines.push_back(reordered_line);
             }
 
