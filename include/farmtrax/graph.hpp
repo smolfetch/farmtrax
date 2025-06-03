@@ -103,9 +103,9 @@ namespace farmtrax {
         std::vector<Vertex> field_traversal(std::shared_ptr<concord::Point> start_point = nullptr) const {
             concord::Point ptr;
             if (!start_point) {
-                ptr = *start_point.get();
-            } else {
                 ptr = swaths_[0]->line.getStart();
+            } else {
+                ptr = *start_point.get();
             }
             return field_traversal(utils::to_boost(ptr));
         }
@@ -145,14 +145,14 @@ namespace farmtrax {
                                           std::shared_ptr<concord::Point> goal = nullptr) const {
             concord::Point start_ptr, goal_ptr;
             if (!start) {
-                start_ptr = *start.get();
-            } else {
                 start_ptr = swaths_[0]->line.getStart();
+            } else {
+                start_ptr = *start.get();
             }
             if (!goal) {
-                goal_ptr = *goal.get();
-            } else {
                 goal_ptr = swaths_[0]->line.getEnd();
+            } else {
+                goal_ptr = *goal.get();
             }
             return shortest_path(utils::to_boost(start_ptr), utils::to_boost(goal_ptr));
         }

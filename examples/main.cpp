@@ -90,8 +90,8 @@ int main() {
         farmtrax::Nety nety(res.swaths_per_machine.at(m));
 
         // Use the start point of the first swath as the starting point machine or nothing
-        // auto sp = std::make_shared<concord::Point>(res.swaths_per_machine.at(m)[0]->line.getStart());
-        auto path = nety.field_traversal();
+        auto sp = std::make_shared<concord::Point>(res.swaths_per_machine.at(m)[0]->line.getStart());
+        auto path = nety.field_traversal(sp);
 
         std::cout << "Machine " << m << " path has " << path.size() << " vertices\n";
 
