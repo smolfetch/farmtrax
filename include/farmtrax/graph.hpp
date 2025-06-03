@@ -52,19 +52,42 @@ namespace farmtrax {
         std::vector<Vertex> vertex_B_; // B endpoints for each line
 
       public:
-        // Constructor from vector of Swaths
-        explicit Nety(const std::vector<std::shared_ptr<const Swath>> &swaths) : swaths_(swaths) {
-            ab_lines_.reserve(swaths.size());
-            for (size_t i = 0; i < swaths.size(); ++i) {
-                ab_lines_.emplace_back(swaths[i]->line.getStart(), swaths[i]->line.getEnd(), swaths[i]->uuid, i);
+        // Constructor from vector of const Swaths (filters to only SwathType::Swath)
+        explicit Nety(const std::vector<std::shared_ptr<const Swath>> &swaths) {
+            // Filter to only include SwathType::Swath
+            for (const auto& swath : swaths) {
+                if (swath->type == SwathType::Swath) {
+                    swaths_.push_back(swath);
+                }
+            }
+            
+            ab_lines_.reserve(swaths_.size());
+            for (size_t i = 0; i < swaths_.size(); ++i) {
+                ab_lines_.emplace_back(swaths_[i]->line.getStart(), swaths_[i]->line.getEnd(), swaths_[i]->uuid, i);
+            }
+            build_graph();
+        }
+
+        // Constructor from vector of non-const Swaths (filters to only SwathType::Swath)
+        explicit Nety(const std::vector<std::shared_ptr<Swath>> &swaths) {
+            // Filter to only include SwathType::Swath
+            for (const auto& swath : swaths) {
+                if (swath->type == SwathType::Swath) {
+                    swaths_.push_back(swath); // implicit conversion to const
+                }
+            }
+            
+            ab_lines_.reserve(swaths_.size());
+            for (size_t i = 0; i < swaths_.size(); ++i) {
+                ab_lines_.emplace_back(swaths_[i]->line.getStart(), swaths_[i]->line.getEnd(), swaths_[i]->uuid, i);
             }
             build_graph();
         }
 
         // Main traversal function - creates agricultural field pattern and reorders swaths
-        std::vector<Vertex> field_traversal(const farmtrax::BPoint &start_point) {
+        void field_traversal(const farmtrax::BPoint &start_point) {
             if (ab_lines_.empty())
-                return {};
+                return;
 
             std::vector<Vertex> path;
             std::vector<bool> visited_lines(ab_lines_.size(), false);
@@ -75,7 +98,7 @@ namespace farmtrax {
             // Find starting line and endpoint
             auto [current_line_id, current_is_A] = find_closest_endpoint(start_point);
             if (current_line_id == SIZE_MAX)
-                return {};
+                return;
 
             while (true) {
                 // Mark current line as visited
@@ -105,30 +128,31 @@ namespace farmtrax {
 
             // Reorder and orient swaths according to traversal
             reorder_swaths(traversal_order);
-
-            return path;
         }
 
-        std::vector<Vertex> field_traversal(std::shared_ptr<concord::Point> start_point = nullptr) {
+        void field_traversal(std::shared_ptr<concord::Point> start_point = nullptr) {
             concord::Point ptr;
             if (!start_point) {
                 ptr = swaths_[0]->line.getStart();
             } else {
                 ptr = *start_point.get();
             }
-            return field_traversal(utils::to_boost(ptr));
+            field_traversal(utils::to_boost(ptr));
         }
 
-        // Calculate shortest path between two points using Dijkstra
-        std::vector<Vertex> shortest_path(const farmtrax::BPoint &start, const farmtrax::BPoint &goal) {
+        // Calculate shortest path between two points using Dijkstra and reorder swaths
+        void shortest_path(const farmtrax::BPoint &start, const farmtrax::BPoint &goal) {
             auto [start_line, start_is_A] = find_closest_endpoint(start);
             auto [goal_line, goal_is_A] = find_closest_endpoint(goal);
 
             if (start_line == SIZE_MAX || goal_line == SIZE_MAX)
-                return {};
+                return;
 
             Vertex start_vertex = start_is_A ? vertex_A_[start_line] : vertex_B_[start_line];
             Vertex goal_vertex = goal_is_A ? vertex_A_[goal_line] : vertex_B_[goal_line];
+
+            // Rebuild graph with connection distances included for shortest path calculation
+            rebuild_graph_with_connection_distances();
 
             std::vector<double> distances(boost::num_vertices(graph_));
             std::vector<Vertex> predecessors(boost::num_vertices(graph_));
@@ -146,12 +170,16 @@ namespace farmtrax {
             path.push_back(start_vertex);
             std::reverse(path.begin(), path.end());
 
-            return path;
+            // Convert vertex path to traversal order considering connection costs
+            std::vector<std::pair<std::size_t, bool>> traversal_order = get_line_sequence_with_connections(path);
+            
+            // Reorder and orient swaths according to shortest path
+            reorder_swaths(traversal_order);
         }
 
         // Overload for concord::Point
-        std::vector<Vertex> shortest_path(std::shared_ptr<concord::Point> start = nullptr,
-                                          std::shared_ptr<concord::Point> goal = nullptr) {
+        void shortest_path(std::shared_ptr<concord::Point> start = nullptr,
+                          std::shared_ptr<concord::Point> goal = nullptr) {
             concord::Point start_ptr, goal_ptr;
             if (!start) {
                 start_ptr = swaths_[0]->line.getStart();
@@ -163,10 +191,9 @@ namespace farmtrax {
             } else {
                 goal_ptr = *goal.get();
             }
-            return shortest_path(utils::to_boost(start_ptr), utils::to_boost(goal_ptr));
+            shortest_path(utils::to_boost(start_ptr), utils::to_boost(goal_ptr));
         }
 
-        std::vector<Swath> vertex_to_swaths(std::vector<Vertex> verts) {}
         // Get total path distance
         double calculate_path_distance(const std::vector<Vertex> &path) const {
             double total_distance = 0.0;
@@ -198,6 +225,51 @@ namespace farmtrax {
                         break;
                     } else if (boost::geometry::distance(point, ab_lines_[i].B) < eps) {
                         sequence.emplace_back(i, false); // B endpoint
+                        break;
+                    }
+                }
+            }
+
+            return sequence;
+        }
+
+        // Get line sequence from vertex path considering connection costs
+        std::vector<std::pair<size_t, bool>> get_line_sequence_with_connections(const std::vector<Vertex> &path) const {
+            std::vector<std::pair<size_t, bool>> sequence;
+            
+            if (path.empty()) return sequence;
+
+            // Process path in pairs to identify line traversals
+            for (size_t i = 0; i < path.size(); ++i) {
+                auto point = boost::get(boost::vertex_name, graph_)[path[i]];
+
+                // Find which line and endpoint this vertex represents
+                for (size_t line_idx = 0; line_idx < ab_lines_.size(); ++line_idx) {
+                    const double eps = 1e-6;
+                    bool is_A_endpoint = boost::geometry::distance(point, ab_lines_[line_idx].A) < eps;
+                    bool is_B_endpoint = boost::geometry::distance(point, ab_lines_[line_idx].B) < eps;
+                    
+                    if (is_A_endpoint || is_B_endpoint) {
+                        // Check if this is the start of a line traversal
+                        if (i + 1 < path.size()) {
+                            auto next_point = boost::get(boost::vertex_name, graph_)[path[i + 1]];
+                            bool next_is_other_endpoint = false;
+                            
+                            if (is_A_endpoint) {
+                                next_is_other_endpoint = boost::geometry::distance(next_point, ab_lines_[line_idx].B) < eps;
+                            } else {
+                                next_is_other_endpoint = boost::geometry::distance(next_point, ab_lines_[line_idx].A) < eps;
+                            }
+                            
+                            // If next vertex is the other endpoint of the same line, this is a line traversal
+                            if (next_is_other_endpoint) {
+                                sequence.emplace_back(line_idx, is_A_endpoint);
+                                ++i; // Skip the next vertex as it's the end of this line
+                                break;
+                            }
+                        }
+                        
+                        // If we reach here, this vertex is part of a connection, not a line traversal
                         break;
                     }
                 }
@@ -242,6 +314,73 @@ namespace farmtrax {
                 add_nearest_connections(vertex_A_[i], ab_lines_[i].A, i);
                 // Connect B endpoint to closest endpoints of other lines
                 add_nearest_connections(vertex_B_[i], ab_lines_[i].B, i);
+            }
+        }
+
+        // Rebuild graph with accurate connection distances for shortest path calculation
+        void rebuild_graph_with_connection_distances() {
+            if (ab_lines_.empty())
+                return;
+
+            // Clear existing data
+            graph_.clear();
+            endpoint_tree_.clear();
+            vertex_A_.clear();
+            vertex_B_.clear();
+
+            vertex_A_.resize(ab_lines_.size());
+            vertex_B_.resize(ab_lines_.size());
+
+            // Add vertices for all endpoints
+            for (size_t i = 0; i < ab_lines_.size(); ++i) {
+                const auto &line = ab_lines_[i];
+
+                // Add A endpoint
+                vertex_A_[i] = boost::add_vertex(VertexProps{line.A}, graph_);
+                endpoint_tree_.insert({line.A, i * 2}); // Even indices for A endpoints
+
+                // Add B endpoint
+                vertex_B_[i] = boost::add_vertex(VertexProps{line.B}, graph_);
+                endpoint_tree_.insert({line.B, i * 2 + 1}); // Odd indices for B endpoints
+
+                // Add edge between A and B (the work line) - using actual swath length
+                boost::add_edge(vertex_A_[i], vertex_B_[i], EdgeProps{line.length()}, graph_);
+            }
+
+            // Add connections with accurate connection distances
+            for (size_t i = 0; i < ab_lines_.size(); ++i) {
+                // Connect A endpoint to closest endpoints of other lines with actual connection distances
+                add_connection_distances(vertex_A_[i], ab_lines_[i].A, i);
+                // Connect B endpoint to closest endpoints of other lines with actual connection distances
+                add_connection_distances(vertex_B_[i], ab_lines_[i].B, i);
+            }
+        }
+
+        // Add connections with accurate distance calculations for shortest path
+        void add_connection_distances(Vertex vertex, const farmtrax::BPoint &point, size_t current_line_id) {
+            std::vector<PointRTreeValue> nearest;
+            endpoint_tree_.query(boost::geometry::index::nearest(point, 8), std::back_inserter(nearest));
+
+            for (const auto &near : nearest) {
+                size_t endpoint_index = near.second;
+                size_t line_id = endpoint_index / 2;
+
+                // Don't connect to same line
+                if (line_id == current_line_id)
+                    continue;
+
+                // Calculate actual connection distance (Euclidean distance between endpoints)
+                double connection_distance = boost::geometry::distance(point, near.first);
+
+                // Only connect to reasonably close endpoints
+                if (connection_distance > 200.0)
+                    continue;
+
+                bool is_A = (endpoint_index % 2 == 0);
+                Vertex target_vertex = is_A ? vertex_A_[line_id] : vertex_B_[line_id];
+
+                // Use the actual connection distance as edge weight
+                boost::add_edge(vertex, target_vertex, EdgeProps{connection_distance}, graph_);
             }
         }
 
@@ -556,7 +695,8 @@ namespace farmtrax {
                 reordered_swaths.push_back(m_swath);
 
                 // Create corresponding AB line with new orientation
-                ABLine reordered_line(m_swath->line.getStart(), m_swath->line.getEnd(), m_swath->uuid, reordered_ab_lines.size());
+                ABLine reordered_line(m_swath->line.getStart(), m_swath->line.getEnd(), m_swath->uuid,
+                                      reordered_ab_lines.size());
                 reordered_ab_lines.push_back(reordered_line);
 
                 // Generate connection swath to the next swath (if not the last one)
@@ -571,15 +711,14 @@ namespace farmtrax {
                     concord::Point next_start = next_start_from_A ? next_swath->getHead() : next_swath->getTail();
 
                     // Create connection swath from current end to next start
-                    auto connection_swath = std::make_shared<Swath>(
-                        create_swath(current_end, next_start, SwathType::Connection)
-                    );
+                    auto connection_swath =
+                        std::make_shared<Swath>(create_swath(current_end, next_start, SwathType::Connection));
 
                     reordered_swaths.push_back(connection_swath);
 
                     // Create corresponding AB line for the connection
-                    ABLine connection_line(connection_swath->line.getStart(), connection_swath->line.getEnd(), 
-                                         connection_swath->uuid, reordered_ab_lines.size());
+                    ABLine connection_line(connection_swath->line.getStart(), connection_swath->line.getEnd(),
+                                           connection_swath->uuid, reordered_ab_lines.size());
                     reordered_ab_lines.push_back(connection_line);
                 }
             }

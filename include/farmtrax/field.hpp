@@ -74,6 +74,7 @@ namespace farmtrax {
     enum class SwathType {
         Swath,
         Connection,
+        Around,
         Headland,
     };
 
