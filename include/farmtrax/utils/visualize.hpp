@@ -98,11 +98,24 @@ namespace farmtrax {
             
             if (swaths.empty()) return;
             
-            std::vector<std::array<float, 3>> tour_points;
-            
-            // Visualize each swath in order
+            // Visualize each swath based on its type
             for (size_t i = 0; i < swaths.size(); ++i) {
                 const auto& swath = swaths[i];
+                
+                // Choose color and radius based on swath type
+                rerun::Color swath_color;
+                float radius;
+                std::string prefix;
+                
+                if (swath->type == SwathType::Connection) {
+                    swath_color = connection_color;
+                    radius = connection_radius;
+                    prefix = "connection";
+                } else {
+                    swath_color = base_color;
+                    radius = swath_radius;
+                    prefix = "swath";
+                }
                 
                 // Visualize the swath line
                 std::vector<std::array<float, 3>> line_points = {
@@ -110,47 +123,10 @@ namespace farmtrax {
                     {float(swath->getTail().enu.x), float(swath->getTail().enu.y), 0.3f}
                 };
                 
-                rec->log_static("/tour/machine" + std::to_string(machine_id) + "/swath" + std::to_string(i),
+                rec->log_static("/tour/machine" + std::to_string(machine_id) + "/" + prefix + std::to_string(i),
                               rerun::LineStrips3D(rerun::components::LineStrip3D(line_points))
-                                  .with_colors({{base_color}})
-                                  .with_radii({{swath_radius}}));
-                
-                // Add start and end points of this swath to tour points
-                tour_points.push_back({float(swath->getHead().enu.x), float(swath->getHead().enu.y), 0.3f});
-                tour_points.push_back({float(swath->getTail().enu.x), float(swath->getTail().enu.y), 0.3f});
-            }
-            
-            // Visualize connection lines between consecutive swaths
-            for (size_t i = 0; i < swaths.size() - 1; ++i) {
-                const auto& current_swath = swaths[i];
-                const auto& next_swath = swaths[i + 1];
-                
-                // Connect tail of current swath to head of next swath (proper head-to-tail connection)
-                std::vector<std::array<float, 3>> connection_segment = {
-                    {float(current_swath->getTail().enu.x), float(current_swath->getTail().enu.y), 0.3f},
-                    {float(next_swath->getHead().enu.x), float(next_swath->getHead().enu.y), 0.3f}
-                };
-                
-                rec->log_static("/tour/machine" + std::to_string(machine_id) + "/connection" + std::to_string(i),
-                              rerun::LineStrips3D(rerun::components::LineStrip3D(connection_segment))
-                                  .with_colors({{connection_color}})
-                                  .with_radii({{connection_radius}}));
-            }
-            
-            // Add start and end markers
-            if (!swaths.empty()) {
-                auto start_point = swaths[0]->getHead();
-                auto end_point = swaths.back()->getTail();
-                
-                rec->log_static("/tour/machine" + std::to_string(machine_id) + "/start",
-                              rerun::Points3D({{float(start_point.enu.x), float(start_point.enu.y), 0.3f}})
-                                  .with_colors({{rerun::Color(0, 255, 0)}})  // Green for start
-                                  .with_radii({{swath_radius * 2.0f}}));
-                                  
-                rec->log_static("/tour/machine" + std::to_string(machine_id) + "/end",
-                              rerun::Points3D({{float(end_point.enu.x), float(end_point.enu.y), 0.3f}})
-                                  .with_colors({{rerun::Color(255, 0, 0)}})  // Red for end
-                                  .with_radii({{swath_radius * 2.0f}}));
+                                  .with_colors({{swath_color}})
+                                  .with_radii({{radius}}));
             }
         }
 

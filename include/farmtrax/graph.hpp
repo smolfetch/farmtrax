@@ -536,8 +536,9 @@ namespace farmtrax {
             std::vector<std::shared_ptr<const Swath>> reordered_swaths;
             std::vector<ABLine> reordered_ab_lines;
 
-            reordered_swaths.reserve(traversal_order.size());
-            reordered_ab_lines.reserve(traversal_order.size());
+            // Reserve space for both swaths and connections
+            reordered_swaths.reserve(traversal_order.size() * 2);
+            reordered_ab_lines.reserve(traversal_order.size() * 2);
 
             // Reorder and orient swaths according to traversal order
             for (std::size_t i = 0; i < traversal_order.size(); ++i) {
@@ -555,8 +556,32 @@ namespace farmtrax {
                 reordered_swaths.push_back(m_swath);
 
                 // Create corresponding AB line with new orientation
-                ABLine reordered_line(m_swath->line.getStart(), m_swath->line.getEnd(), m_swath->uuid, i);
+                ABLine reordered_line(m_swath->line.getStart(), m_swath->line.getEnd(), m_swath->uuid, reordered_ab_lines.size());
                 reordered_ab_lines.push_back(reordered_line);
+
+                // Generate connection swath to the next swath (if not the last one)
+                if (i < traversal_order.size() - 1) {
+                    const auto &[next_swath_index, next_start_from_A] = traversal_order[i + 1];
+                    std::shared_ptr<const Swath> next_swath = swaths_[next_swath_index];
+
+                    // Current swath's end point
+                    concord::Point current_end = m_swath->getTail();
+
+                    // Next swath's start point (considering its orientation)
+                    concord::Point next_start = next_start_from_A ? next_swath->getHead() : next_swath->getTail();
+
+                    // Create connection swath from current end to next start
+                    auto connection_swath = std::make_shared<Swath>(
+                        create_swath(current_end, next_start, SwathType::Connection)
+                    );
+
+                    reordered_swaths.push_back(connection_swath);
+
+                    // Create corresponding AB line for the connection
+                    ABLine connection_line(connection_swath->line.getStart(), connection_swath->line.getEnd(), 
+                                         connection_swath->uuid, reordered_ab_lines.size());
+                    reordered_ab_lines.push_back(connection_line);
+                }
             }
 
             // Update the vectors
