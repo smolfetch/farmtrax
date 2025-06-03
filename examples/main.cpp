@@ -89,9 +89,9 @@ int main() {
         // Create Nety instance directly from swaths
         farmtrax::Nety nety(res.swaths_per_machine.at(m));
 
-        // Use the start point of the first swath as the starting point machine
-        auto sp = res.swaths_per_machine.at(m)[0]->line.getStart();
-        auto path = nety.field_traversal(sp);
+        // Use the start point of the first swath as the starting point machine or nothing
+        // auto sp = std::make_shared<concord::Point>(res.swaths_per_machine.at(m)[0]->line.getStart());
+        auto path = nety.field_traversal();
 
         std::cout << "Machine " << m << " path has " << path.size() << " vertices\n";
 

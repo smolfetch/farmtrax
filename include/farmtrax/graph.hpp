@@ -40,7 +40,7 @@ namespace farmtrax {
 
         double length() const { return boost::geometry::distance(A, B); }
 
-        bool equal(const Swath &swath) { return true ? uuid == swath.uuid : false; }
+        bool equal(const Swath &swath) { return true ? uuid == swath.uuid : false; } // TODO: amke this an operator
     };
 
     class Nety {
@@ -100,11 +100,14 @@ namespace farmtrax {
             return path;
         }
 
-        std::vector<Swath> vertex_to_swaths(std::vector<Vertex> verts) {}
-
-        // Overload for concord::Point
-        std::vector<Vertex> field_traversal(const concord::Point &start_point) const {
-            return field_traversal(utils::to_boost(start_point));
+        std::vector<Vertex> field_traversal(std::shared_ptr<concord::Point> start_point = nullptr) const {
+            concord::Point ptr;
+            if (!start_point) {
+                ptr = *start_point.get();
+            } else {
+                ptr = swaths_[0]->line.getStart();
+            }
+            return field_traversal(utils::to_boost(ptr));
         }
 
         // Calculate shortest path between two points using Dijkstra
@@ -138,10 +141,23 @@ namespace farmtrax {
         }
 
         // Overload for concord::Point
-        std::vector<Vertex> shortest_path(const concord::Point &start, const concord::Point &goal) const {
-            return shortest_path(utils::to_boost(start), utils::to_boost(goal));
+        std::vector<Vertex> shortest_path(std::shared_ptr<concord::Point> start = nullptr,
+                                          std::shared_ptr<concord::Point> goal = nullptr) const {
+            concord::Point start_ptr, goal_ptr;
+            if (!start) {
+                start_ptr = *start.get();
+            } else {
+                start_ptr = swaths_[0]->line.getStart();
+            }
+            if (!goal) {
+                goal_ptr = *goal.get();
+            } else {
+                goal_ptr = swaths_[0]->line.getEnd();
+            }
+            return shortest_path(utils::to_boost(start_ptr), utils::to_boost(goal_ptr));
         }
 
+        std::vector<Swath> vertex_to_swaths(std::vector<Vertex> verts) {}
         // Get total path distance
         double calculate_path_distance(const std::vector<Vertex> &path) const {
             double total_distance = 0.0;
