@@ -71,10 +71,17 @@ namespace farmtrax {
         return ring;
     }
 
+    enum class SwathType {
+        Sath,
+        Turn,
+        Head,
+    };
+
     struct Swath {
         concord::Line line;
         std::string uuid;
         bool finished = false;
+        SwathType type = SwathType::Sath; // Default type is Sath
         BLineString b_line;
         BBox bounding_box; // Add bounding box for R-tree
         
