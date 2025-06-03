@@ -104,7 +104,7 @@ namespace farmtrax {
             }
 
             // Reorder and orient swaths according to traversal
-            reorder_and_orient_swaths(traversal_order);
+            reorder_swaths(traversal_order);
 
             return path;
         }
@@ -528,10 +528,11 @@ namespace farmtrax {
         }
 
         // Reorder and orient swaths according to the traversal order with direction info
-        void reorder_and_orient_swaths(const std::vector<std::pair<std::size_t, bool>> &traversal_order) {
+        void reorder_swaths(const std::vector<std::pair<std::size_t, bool>> &traversal_order) {
             if (traversal_order.empty())
                 return;
 
+            // TODO: Linek the actual swaths from swath_ not creating a new copy. Check cos might be implemented
             std::vector<std::shared_ptr<const Swath>> reordered_swaths;
             std::vector<ABLine> reordered_ab_lines;
 
@@ -544,18 +545,17 @@ namespace farmtrax {
                 std::shared_ptr<const Swath> swath = swaths_[swath_index];
 
                 // Create a mutable copy to potentially modify direction
-                auto mutable_swath = std::make_shared<Swath>(*swath);
+                auto m_swath = std::make_shared<Swath>(*swath);
 
                 // If we need to traverse from B to A (not start_from_A), swap the direction
                 if (!start_from_A) {
-                    mutable_swath->swapDirection();
+                    m_swath->swapDirection();
                 }
 
-                reordered_swaths.push_back(mutable_swath);
+                reordered_swaths.push_back(m_swath);
 
                 // Create corresponding AB line with new orientation
-                ABLine reordered_line(mutable_swath->line.getStart(), mutable_swath->line.getEnd(), mutable_swath->uuid,
-                                      i);
+                ABLine reordered_line(m_swath->line.getStart(), m_swath->line.getEnd(), m_swath->uuid, i);
                 reordered_ab_lines.push_back(reordered_line);
             }
 
