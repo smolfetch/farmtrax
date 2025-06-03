@@ -86,13 +86,8 @@ int main() {
             continue;
         }
 
-        // Convert swaths to AB lines for Nety class
-        std::vector<std::pair<concord::Point, concord::Point>> ab_pairs;
-        for (const auto &swath : res.swaths_per_machine.at(m)) {
-            ab_pairs.emplace_back(swath->line.getStart(), swath->line.getEnd());
-        }
-
-        farmtrax::Nety nety(ab_pairs);
+        // Create Nety instance directly from swaths
+        farmtrax::Nety nety(res.swaths_per_machine.at(m));
 
         // Use the start point of the first swath as the starting point for this machine
         auto first_swath = res.swaths_per_machine.at(m)[0];

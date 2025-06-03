@@ -28,13 +28,14 @@ namespace farmtrax {
     struct ABLine {
         farmtrax::BPoint A;
         farmtrax::BPoint B;
+        std::string uuid;
         std::size_t line_id;
 
-        ABLine(const farmtrax::BPoint &a, const farmtrax::BPoint &b, std::size_t id) : A(a), B(b), line_id(id) {}
+        ABLine(const farmtrax::BPoint &a, const farmtrax::BPoint &b, std::string uuid, std::size_t id) : A(a), B(b), uuid(uuid), line_id(id) {}
 
         // Constructor from concord::Point
-        ABLine(const concord::Point &a, const concord::Point &b, std::size_t id)
-            : A(utils::to_boost(a)), B(utils::to_boost(b)), line_id(id) {}
+        ABLine(const concord::Point &a, const concord::Point &b, std::string uuid, std::size_t id)
+            : A(utils::to_boost(a)), B(utils::to_boost(b)), uuid(uuid), line_id(id) {}
 
         double length() const { return boost::geometry::distance(A, B); }
     };
@@ -48,19 +49,19 @@ namespace farmtrax {
         }
 
         // Constructor from vector of point pairs (farmtrax::BPoint)
-        explicit Nety(const std::vector<std::pair<farmtrax::BPoint, farmtrax::BPoint>> &point_pairs) {
+        explicit Nety(const std::vector<std::pair<farmtrax::BPoint, farmtrax::BPoint>> &point_pairs, std::string uuid = "") {
             ab_lines_.reserve(point_pairs.size());
             for (size_t i = 0; i < point_pairs.size(); ++i) {
-                ab_lines_.emplace_back(point_pairs[i].first, point_pairs[i].second, i);
+                ab_lines_.emplace_back(point_pairs[i].first, point_pairs[i].second, uuid, i);
             }
             build_graph();
         }
 
         // Constructor from vector of point pairs (concord::Point)
-        explicit Nety(const std::vector<std::pair<concord::Point, concord::Point>> &point_pairs) {
+        explicit Nety(const std::vector<std::pair<concord::Point, concord::Point>> &point_pairs, std::string uuid = "") {
             ab_lines_.reserve(point_pairs.size());
             for (size_t i = 0; i < point_pairs.size(); ++i) {
-                ab_lines_.emplace_back(point_pairs[i].first, point_pairs[i].second, i);
+                ab_lines_.emplace_back(point_pairs[i].first, point_pairs[i].second, uuid, i);
             }
             build_graph();
         }
@@ -71,7 +72,25 @@ namespace farmtrax {
             ab_lines_.reserve(p.swaths.size());
             for (size_t i = 0; i < p.swaths.size(); ++i) {
                 const auto &swath = p.swaths[i];
-                ab_lines_.emplace_back(swath.b_line.front(), swath.b_line.back(), i);
+                ab_lines_.emplace_back(swath.b_line.front(), swath.b_line.back(), swath.uuid, i);
+            }
+            build_graph();
+        }
+
+        // Constructor from vector of Swaths
+        explicit Nety(const std::vector<std::shared_ptr<const Swath>> &swaths) {
+            ab_lines_.reserve(swaths.size());
+            for (size_t i = 0; i < swaths.size(); ++i) {
+                ab_lines_.emplace_back(swaths[i]->line.getStart(), swaths[i]->line.getEnd(), swaths[i]->uuid, i);
+            }
+            build_graph();
+        }
+
+        // Overload for a vector of non-const Swaths
+        explicit Nety(const std::vector<Swath> &swaths) {
+            ab_lines_.reserve(swaths.size());
+            for (size_t i = 0; i < swaths.size(); ++i) {
+                ab_lines_.emplace_back(swaths[i].line.getStart(), swaths[i].line.getEnd(), swaths[i].uuid, i);
             }
             build_graph();
         }
