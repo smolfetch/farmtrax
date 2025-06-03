@@ -61,13 +61,14 @@ namespace farmtrax {
             build_graph();
         }
 
-        // Main traversal function - creates agricultural field pattern
-        std::vector<Vertex> field_traversal(const farmtrax::BPoint &start_point) const {
+        // Main traversal function - creates agricultural field pattern and reorders swaths
+        std::vector<Vertex> field_traversal(const farmtrax::BPoint &start_point) {
             if (ab_lines_.empty())
                 return {};
 
             std::vector<Vertex> path;
             std::vector<bool> visited_lines(ab_lines_.size(), false);
+            std::vector<std::size_t> line_order; // Track the order of lines visited
 
             // Find starting line and endpoint
             auto [current_line_id, current_is_A] = find_closest_endpoint(start_point);
@@ -77,6 +78,7 @@ namespace farmtrax {
             while (true) {
                 // Mark current line as visited
                 visited_lines[current_line_id] = true;
+                line_order.push_back(current_line_id);
 
                 // Add both vertices of current line to path (A->B or B->A)
                 Vertex start_vertex = current_is_A ? vertex_A_[current_line_id] : vertex_B_[current_line_id];
@@ -97,10 +99,13 @@ namespace farmtrax {
                 current_is_A = next_is_A;
             }
 
+            // Reorder swaths according to traversal order
+            reorder_swaths(line_order);
+
             return path;
         }
 
-        std::vector<Vertex> field_traversal(std::shared_ptr<concord::Point> start_point = nullptr) const {
+        std::vector<Vertex> field_traversal(std::shared_ptr<concord::Point> start_point = nullptr) {
             concord::Point ptr;
             if (!start_point) {
                 ptr = swaths_[0]->line.getStart();
@@ -111,7 +116,7 @@ namespace farmtrax {
         }
 
         // Calculate shortest path between two points using Dijkstra
-        std::vector<Vertex> shortest_path(const farmtrax::BPoint &start, const farmtrax::BPoint &goal) const {
+        std::vector<Vertex> shortest_path(const farmtrax::BPoint &start, const farmtrax::BPoint &goal) {
             auto [start_line, start_is_A] = find_closest_endpoint(start);
             auto [goal_line, goal_is_A] = find_closest_endpoint(goal);
 
@@ -142,7 +147,7 @@ namespace farmtrax {
 
         // Overload for concord::Point
         std::vector<Vertex> shortest_path(std::shared_ptr<concord::Point> start = nullptr,
-                                          std::shared_ptr<concord::Point> goal = nullptr) const {
+                                          std::shared_ptr<concord::Point> goal = nullptr) {
             concord::Point start_ptr, goal_ptr;
             if (!start) {
                 start_ptr = swaths_[0]->line.getStart();
@@ -172,6 +177,7 @@ namespace farmtrax {
         // Access methods for visualization
         const Graph &get_graph() const { return graph_; }
         const std::vector<ABLine> &get_ab_lines() const { return ab_lines_; }
+        const std::vector<std::shared_ptr<const Swath>> &get_swaths() const { return swaths_; }
 
         // Get line sequence from vertex path (for visualization)
         std::vector<std::pair<size_t, bool>> get_line_sequence(const std::vector<Vertex> &path) const {
@@ -515,6 +521,36 @@ namespace farmtrax {
 
             // Consider lines similar if angle is < 15 degrees
             return angle < (15.0 * M_PI / 180.0);
+        }
+
+        // Reorder swaths according to the traversal order
+        void reorder_swaths(const std::vector<std::size_t> &line_order) {
+            if (line_order.empty() || line_order.size() != swaths_.size())
+                return;
+
+            std::vector<std::shared_ptr<const Swath>> reordered_swaths;
+            std::vector<ABLine> reordered_ab_lines;
+            
+            reordered_swaths.reserve(swaths_.size());
+            reordered_ab_lines.reserve(ab_lines_.size());
+
+            // Reorder both swaths and ab_lines according to traversal order
+            for (std::size_t i = 0; i < line_order.size(); ++i) {
+                std::size_t original_index = line_order[i];
+                reordered_swaths.push_back(swaths_[original_index]);
+                
+                // Update line_id to reflect new position
+                ABLine reordered_line = ab_lines_[original_index];
+                reordered_line.line_id = i;
+                reordered_ab_lines.push_back(reordered_line);
+            }
+
+            // Update the vectors
+            swaths_ = std::move(reordered_swaths);
+            ab_lines_ = std::move(reordered_ab_lines);
+
+            // Rebuild the graph with the new ordering
+            build_graph();
         }
     };
 

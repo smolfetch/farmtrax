@@ -93,14 +93,13 @@ int main() {
 
             // Create Nety instance directly from swaths
             farmtrax::Nety nety(res.swaths_per_machine.at(m));
-            auto path = nety.field_traversal();
+            auto path = nety.field_traversal(); // This reorders the swaths internally
 
             std::cout << "Machine " << m << " path has " << path.size() << " vertices\n";
+            std::cout << "Machine " << m << " has " << nety.get_swaths().size() << " reordered swaths\n";
 
-            // Visualize the optimized swath tour with connections
-            farmtrax::visualize::show_swath_tour(nety, path, rec, m);
-
-            // … convert vertex descriptors back to ENU coords or swath indices …
+            // Visualize the optimized swath tour using the reordered swaths
+            farmtrax::visualize::show_swath_tour(nety, rec, m);
         }
     }
 
