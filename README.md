@@ -137,8 +137,15 @@ Farmtrax provides sophisticated algorithms for:
 
 ### 1. **Field Input & Partitioning**
 - Load GeoJSON polygon boundaries
-- Split complex fields into manageable parts using area thresholds
+- **Intelligent Multi-Criteria Field Partitioning**: Advanced polygon splitting system
+  - **Area-based splitting**: Split fields exceeding size thresholds (default 5 hectares)
+  - **Bridge detection**: Identify and split narrow connections using morphological erosion
+  - **Convexity analysis**: Split highly concave fields (below 60% convexity ratio)
+  - **Aspect ratio control**: Split elongated fields with excessive length/width ratios
+  - **Tooth/extension detection**: Identify and separate field protrusions and concavities
+  - **Recursive partitioning**: Apply multiple criteria with configurable depth limits
 - Handle irregular shapes and multiple disconnected areas
+- Configurable partitioning criteria for different agricultural scenarios
 
 ### 2. **Headland Generation**
 - Create turning areas by buffering field boundaries inward
@@ -362,6 +369,213 @@ nety.field_traversal(); // Optimizes and reorders swaths
 - **Spatial Clustering**: Groups nearby parallel lines
 - **Progressive Search**: Expanding radius nearest-neighbor queries
 - **Direction Optimization**: Minimizes cross-field movements
+
+---
+
+## Advanced Field Partitioning System
+
+Farmtrax includes a sophisticated **multi-criteria field partitioning system** that intelligently splits complex agricultural fields into manageable parts. This system goes far beyond simple area-based splitting.
+
+### Partitioning Strategies
+
+The `farmtrax::Partitioner` class implements five distinct splitting strategies applied in priority order:
+
+#### 1. **Area-Based Splitting** (Highest Priority)
+```cpp
+farmtrax::Partitioner::PartitionCriteria criteria;
+criteria.max_area = 50000.0;  // 5 hectares maximum
+```
+- Splits fields exceeding area thresholds
+- Uses geometric center-line cutting
+- Splits along the longer dimension for optimal shapes
+
+#### 2. **Bridge Detection** (Narrow Connection Analysis)
+```cpp
+criteria.min_bridge_width = 20.0;        // Minimum bridge width in meters
+criteria.enable_bridge_detection = true;
+```
+- Uses **morphological erosion** to detect narrow connections
+- Applies negative buffer operations to identify bottlenecks
+- Automatically splits at narrowest connection points
+
+#### 3. **Tooth/Extension Detection** (Concavity Analysis)
+```cpp
+criteria.tooth_threshold = 0.3;         // 30% area threshold for teeth
+criteria.enable_tooth_detection = true;
+```
+- Calculates **convex hull difference** to find concave areas
+- Identifies field "teeth" and protruding extensions
+- Splits across significant concavities exceeding threshold
+
+#### 4. **Aspect Ratio Control** (Elongation Splitting)
+```cpp
+criteria.max_aspect_ratio = 4.0;        // Maximum length/width ratio
+criteria.enable_aspect_splitting = true;
+```
+- Prevents overly elongated field parts
+- Maintains workable field proportions
+- Optimizes for machinery turning patterns
+
+#### 5. **Convexity Analysis** (Shape Quality Control)
+```cpp
+criteria.min_convexity = 0.6;           // Minimum 60% convexity ratio
+```
+- Calculates `polygon_area / convex_hull_area` ratio
+- Splits highly irregular, non-convex shapes
+- Ensures workable field geometry
+
+### Advanced Configuration
+
+```cpp
+// Create partitioner with custom criteria
+farmtrax::Partitioner partitioner(field_polygon, datum);
+
+farmtrax::Partitioner::PartitionCriteria custom_criteria;
+custom_criteria.max_area = 25000.0;              // 2.5 hectares max
+custom_criteria.min_convexity = 0.75;            // Stricter convexity
+custom_criteria.max_aspect_ratio = 3.0;          // Prevent elongation
+custom_criteria.min_bridge_width = 15.0;         // Aggressive bridge detection
+custom_criteria.tooth_threshold = 0.2;           // Sensitive tooth detection
+custom_criteria.max_recursion_depth = 6;         // Deep recursive splitting
+custom_criteria.enable_bridge_detection = true;
+custom_criteria.enable_tooth_detection = true;
+custom_criteria.enable_aspect_splitting = true;
+
+// Apply intelligent partitioning
+auto field_parts = partitioner.partition(25000.0, custom_criteria);
+```
+
+### Integration with Field Processing
+
+The partitioning system is seamlessly integrated into the main `Field` class:
+
+```cpp
+// Automatic partitioning during field creation
+farmtrax::Field field(polygon, 0.1, datum, true, 0.7, 15000.0); // 1.5 hectare threshold
+
+// Each part gets independent processing
+for (const auto& part : field.get_parts()) {
+    // Each part has: headlands, swaths, spatial indices
+    std::cout << "Part: " << part.headlands.size() << " headlands, " 
+              << part.swaths.size() << " swaths\n";
+}
+```
+
+### Real-World Applications
+
+- **Complex Field Shapes**: L-shaped, T-shaped, and irregular boundaries
+- **Bridge Fields**: Fields connected by narrow access routes
+- **Concave Fields**: Fields with internal concavities or "bites"
+- **Large Fields**: Automatically split oversized fields for efficient management
+- **Multi-Machine Operations**: Create optimal work zones for multiple machines
+
+---
+
+## Advanced Field Partitioning System
+
+Farmtrax features a sophisticated **multi-criteria field partitioning system** that intelligently splits complex agricultural fields into manageable work areas. The system goes far beyond simple area-based splitting to handle real-world field complexities.
+
+### Multi-Criteria Partitioner (`farmtrax::Partitioner`)
+
+The intelligent partitioner uses **five different splitting strategies** in priority order:
+
+#### 1. **Area-Based Splitting** (Primary Constraint)
+```cpp
+criteria.max_area = 50000.0;            // Maximum area in square meters (5 hectares)
+```
+- Ensures field parts remain within manageable size limits
+- Splits along the **longer dimension** for optimal machinery access
+- Foundation for all other splitting criteria
+
+#### 2. **Narrow Bridge Detection** (Connectivity Analysis)
+```cpp
+criteria.min_bridge_width = 20.0;       // Minimum bridge width in meters
+criteria.enable_bridge_detection = true;
+```
+- Uses **polygon erosion** techniques to detect narrow connections
+- Identifies bottlenecks that create inefficient machinery paths
+- Automatically splits at the narrowest connection points
+
+#### 3. **Tooth/Extension Detection** (Concavity Analysis)
+```cpp
+criteria.tooth_threshold = 0.3;         // 30% area threshold for teeth
+criteria.enable_tooth_detection = true;
+```
+- Calculates **convex hull difference** to find concave areas
+- Identifies field "teeth" and protruding extensions
+- Splits across significant concavities exceeding threshold
+
+#### 4. **Aspect Ratio Control** (Elongation Splitting)
+```cpp
+criteria.max_aspect_ratio = 4.0;        // Maximum length/width ratio
+criteria.enable_aspect_splitting = true;
+```
+- Prevents overly elongated field parts
+- Maintains workable field proportions
+- Optimizes for machinery turning patterns
+
+#### 5. **Convexity Analysis** (Shape Quality Control)
+```cpp
+criteria.min_convexity = 0.6;           // Minimum 60% convexity ratio
+```
+- Measures polygon **area/convex_hull_area ratio**
+- Ensures field parts have reasonable geometric properties
+- Fallback splitting when other criteria fail
+
+### Advanced Configuration
+
+```cpp
+// Create partitioner with intelligent defaults
+farmtrax::Partitioner partitioner(field_polygon, datum);
+
+// Configure custom criteria for specific agricultural needs
+farmtrax::Partitioner::PartitionCriteria criteria;
+criteria.max_area = 15000.0;                    // 1.5 hectares max
+criteria.min_convexity = 0.7;                   // 70% convexity required
+criteria.max_aspect_ratio = 3.0;                // 3:1 max length/width
+criteria.min_bridge_width = 15.0;               // 15m minimum bridge width
+criteria.tooth_threshold = 0.25;                // 25% area threshold
+criteria.max_recursion_depth = 6;               // Deep recursive splitting
+criteria.enable_bridge_detection = true;
+criteria.enable_tooth_detection = true;
+criteria.enable_aspect_splitting = true;
+
+// Apply intelligent partitioning
+auto field_parts = partitioner.partition(15000.0, criteria);
+std::cout << "Field intelligently split into " << field_parts.size() << " parts\n";
+```
+
+### Geometric Algorithms
+
+The partitioner employs sophisticated **Boost Geometry algorithms**:
+
+- **Buffer Operations**: Erosion-based bridge detection
+- **Convex Hull Analysis**: Shape complexity measurement
+- **Boolean Operations**: Polygon cutting and splitting
+- **Centroid Calculations**: Optimal split line placement
+- **Envelope Analysis**: Bounding box-based aspect ratios
+
+### Integration with Processing Pipeline
+
+```cpp
+// Automatic integration during field creation
+farmtrax::Field field(polygon, resolution, datum, centered, overlap, area_threshold);
+// Field is automatically partitioned based on area_threshold
+
+// Access partitioned field parts
+for (const auto& part : field.get_parts()) {
+    std::cout << "Part: " << part.headlands.size() << " headlands, " 
+              << part.swaths.size() << " swaths\n";
+}
+```
+
+### Agricultural Benefits
+
+- **Machinery Efficiency**: Eliminates long traverses between disconnected areas
+- **Pattern Recognition**: Identifies field geometry patterns for optimal work sequences
+- **Obstacle Integration**: Works seamlessly with obstacle avoidance systems
+- **Scalability**: Handles fields from small plots to large commercial operations
+- **Quality Assurance**: Ensures each part is workable by agricultural machinery
 
 ---
 

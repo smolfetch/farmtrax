@@ -64,43 +64,44 @@ int main() {
 
     // Create some example obstacles (e.g., trees, buildings, water bodies)
     std::vector<concord::Polygon> obstacles;
-    
+
     // Calculate the actual center of the field based on its bounds
     double min_x = std::numeric_limits<double>::max();
     double max_x = std::numeric_limits<double>::lowest();
     double min_y = std::numeric_limits<double>::max();
     double max_y = std::numeric_limits<double>::lowest();
-    
-    for (const auto& point : poly.getPoints()) {
+
+    for (const auto &point : poly.getPoints()) {
         min_x = std::min(min_x, point.enu.x);
         max_x = std::max(max_x, point.enu.x);
         min_y = std::min(min_y, point.enu.y);
         max_y = std::max(max_y, point.enu.y);
     }
-    
+
     double center_x = (min_x + max_x) / 2.0;
     double center_y = (min_y + max_y) / 2.0;
-    
+
     std::cout << "Field bounds: x[" << min_x << ", " << max_x << "], y[" << min_y << ", " << max_y << "]\n";
     std::cout << "Field center: (" << center_x << ", " << center_y << ")\n";
-    
+
     // Create a square obstacle at the center of the field
     concord::Polygon obstacle1;
     double obstacle_size = 15.0; // 15 meter square obstacle
-    
+
     obstacle1.addPoint(concord::Point{concord::ENU{center_x - obstacle_size, center_y - obstacle_size, 0}, datum});
     obstacle1.addPoint(concord::Point{concord::ENU{center_x + obstacle_size, center_y - obstacle_size, 0}, datum});
     obstacle1.addPoint(concord::Point{concord::ENU{center_x + obstacle_size, center_y + obstacle_size, 0}, datum});
     obstacle1.addPoint(concord::Point{concord::ENU{center_x - obstacle_size, center_y + obstacle_size, 0}, datum});
-    obstacle1.addPoint(concord::Point{concord::ENU{center_x - obstacle_size, center_y - obstacle_size, 0}, datum}); // Close polygon
-    
+    obstacle1.addPoint(
+        concord::Point{concord::ENU{center_x - obstacle_size, center_y - obstacle_size, 0}, datum}); // Close polygon
+
     obstacles.push_back(obstacle1);
-    
+
     // Create obstacle avoider
     farmtrax::ObstacleAvoider avoider(obstacles, datum);
-    
+
     std::cout << "Created " << obstacles.size() << " obstacles\n";
-    
+
     // Visualize obstacles
     farmtrax::visualize::show_obstacles(obstacles, rec);
 
@@ -135,15 +136,16 @@ int main() {
 
             // Apply obstacle avoidance to the swaths
             std::cout << "Machine " << m << " original swaths: " << res.swaths_per_machine.at(m).size() << "\n";
-            
+
             // Apply obstacle avoidance with 2.0 meter inflation distance
             auto avoided_swaths = avoider.avoid(res.swaths_per_machine.at(m), 2.0f);
-                        
+
             // Create Nety instance from obstacle-avoided swaths (now filters to only SwathType::Swath)
             farmtrax::Nety nety(avoided_swaths);
             nety.field_traversal(); // This reorders the swaths internally
 
-            std::cout << "Machine " << m << " has " << nety.get_swaths().size() << " swaths in Nety after filtering (only regular swaths)\n";
+            std::cout << "Machine " << m << " has " << nety.get_swaths().size()
+                      << " swaths in Nety after filtering (only regular swaths)\n";
 
             // Visualize the optimized swath tour using the reordered swaths
             farmtrax::visualize::show_swath_tour(nety, rec, m);

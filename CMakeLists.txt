@@ -105,6 +105,7 @@ if(FARMTRAX_BUILD_EXAMPLES)
   
   set(exe
     examples/main.cpp
+    examples/advanced_partitioning_example.cpp
   )
   # ----------------------------------------------
   set(exec_names)
