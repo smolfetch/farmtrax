@@ -8,6 +8,7 @@
 #include "../graph.hpp"
 #include "rerun.hpp"
 #include <array>
+#include <rerun/result.hpp>
 #include <rerun/recording_stream.hpp>
 #include <vector>
 
