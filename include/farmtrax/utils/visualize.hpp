@@ -165,6 +165,18 @@ namespace farmtrax {
             show_swath_tour(nety.get_swaths(), rec, machine_id, swath_radius, connection_radius);
         }
 
+        // Overload that includes partition information for clearer naming
+        inline void show_swath_tour(const farmtrax::Nety &nety,
+                                   std::shared_ptr<rerun::RecordingStream> rec, 
+                                   size_t partition_id,
+                                   size_t machine_id,
+                                   float swath_radius = 0.4f,
+                                   float connection_radius = 0.2f) {
+            // Create a unique ID that includes both partition and machine
+            size_t unique_id = partition_id * 100 + machine_id;
+            show_swath_tour(nety.get_swaths(), rec, unique_id, swath_radius, connection_radius);
+        }
+
         // Visualize obstacles as border-only polygons
         inline void show_obstacles(const std::vector<concord::Polygon> &obstacles,
                                   std::shared_ptr<rerun::RecordingStream> rec,

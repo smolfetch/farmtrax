@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <thread>
 
 #include "concord/concord.hpp"
@@ -42,7 +43,15 @@ int main() {
         std::cout << "x: " << p.enu.x << ", y: " << p.enu.y << ", z: " << p.enu.z << "\n";
     }
 
-    farmtrax::Field field(poly, 0.1, datum, true, 0.5);
+    // === FIELD PARTITIONING ===
+    std::cout << "\n=== Field Partitioning by Area ===\n";
+    
+    // Test area-based partitioning with different thresholds
+    std::cout << "Testing different area thresholds:\n";
+       
+    farmtrax::Field field(poly, 0.1, datum, true, 0.7, 50000.0);
+    std::cout << "Field partitioned into " << field.get_parts().size() << " manageable parts\n";
+    
     field.add_noise();
 
     // geotiv::Layer layer;
@@ -106,12 +115,24 @@ int main() {
     farmtrax::visualize::show_obstacles(obstacles, rec);
 
     auto part_cnt = field.get_parts().size();
-    std::cout << "Part count: " << part_cnt << "\n";
+    std::cout << "\n=== Field Processing with Area-Based Partitioning ===\n";
+    std::cout << "Total field parts: " << part_cnt << "\n";
 
     farmtrax::visualize::show_field(field, rec);
     std::this_thread::sleep_for(std::chrono::seconds(2));
 
     for (size_t f = 0; f < field.get_parts().size(); f++) {
+        std::cout << "\n--- Processing Field Part " << (f + 1) << " of " << part_cnt << " ---\n";
+        
+        const auto& part = field.get_parts()[f];
+        
+        // Calculate part area to show partitioning effectiveness
+        auto part_area = boost::geometry::area(part.border.b_polygon);
+        std::cout << "Part " << (f + 1) << ": " 
+                  << std::fixed << std::setprecision(1) << part_area << " sq.m (" 
+                  << (part_area / 10000.0) << " hectares), "
+                  << part.headlands.size() << " headlands, " 
+                  << part.swaths.size() << " swaths\n";
 
         auto fieldPtr = std::make_shared<farmtrax::Part>(field.get_parts()[f]);
         farmtrax::Divy divy(fieldPtr, farmtrax::DivisionType::ALTERNATE, num_machines);
@@ -148,7 +169,8 @@ int main() {
                       << " swaths in Nety after filtering (only regular swaths)\n";
 
             // Visualize the optimized swath tour using the reordered swaths
-            farmtrax::visualize::show_swath_tour(nety, rec, m);
+            // Use partition-aware visualization to prevent naming conflicts
+            farmtrax::visualize::show_swath_tour(nety, rec, f, m);
         }
     }
 
