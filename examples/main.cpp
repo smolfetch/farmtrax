@@ -169,8 +169,7 @@ int main() {
                       << " swaths in Nety after filtering (only regular swaths)\n";
 
             // Visualize the optimized swath tour using the reordered swaths
-            // Use partition-aware visualization to prevent naming conflicts
-            farmtrax::visualize::show_swath_tour(nety, rec, f, m);
+            farmtrax::visualize::show_swath_tour(nety, rec, m);
         }
     }
 

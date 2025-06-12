@@ -17,29 +17,31 @@ set(params
     -Wno-reorder
 )
 
-option(FARMTRAX_BUILD_EXAMPLES "Build examples" OFF)
+string(TOUPPER ${project_name} project_name_upper)                                                                                                                                                                                                          
+option(${project_name_upper}_BUILD_EXAMPLES "Build examples" OFF)                                                                                                                                                                                           
+option(${project_name_upper}_ENABLE_TESTS "Enable tests" OFF)                                                                                                                                                                                               
 include(FetchContent)
 
 # --------------------------------------------------------------------------------------------------
 set(ext_deps)
 
-FetchContent_Declare(concord GIT_REPOSITORY https://github.com/smolfetch/concord.git GIT_TAG 1.0.0)
+FetchContent_Declare(concord GIT_REPOSITORY https://github.com/smolfetch/concord.git GIT_TAG develop)
 FetchContent_MakeAvailable(concord)
 list(APPEND ext_deps concord::concord)
 
-FetchContent_Declare(pigment GIT_REPOSITORY https://github.com/smolfetch/pigment.git GIT_TAG main)
+FetchContent_Declare(pigment GIT_REPOSITORY https://github.com/smolfetch/pigment.git GIT_TAG develop)
 FetchContent_MakeAvailable(pigment)
 list(APPEND ext_deps pigment::pigment)
 
-FetchContent_Declare(entropy GIT_REPOSITORY https://github.com/smolfetch/entropy.git GIT_TAG main)
+FetchContent_Declare(entropy GIT_REPOSITORY https://github.com/smolfetch/entropy.git GIT_TAG develop)
 FetchContent_MakeAvailable(entropy)
 list(APPEND ext_deps entropy::entropy)
 
-FetchContent_Declare(geoson GIT_REPOSITORY https://github.com/smolfetch/geoson.git GIT_TAG main)
+FetchContent_Declare(geoson GIT_REPOSITORY https://github.com/smolfetch/geoson.git GIT_TAG develop)
 FetchContent_MakeAvailable(geoson)
-list(APPEND ext_deps geoson::geoson)
+list(APPEND ext_deps geoson::geoson) 
 
-FetchContent_Declare(geotiv GIT_REPOSITORY https://github.com/smolfetch/geotiv.git GIT_TAG main)
+FetchContent_Declare(geotiv GIT_REPOSITORY https://github.com/smolfetch/geotiv.git GIT_TAG develop)
 FetchContent_MakeAvailable(geotiv)
 list(APPEND ext_deps geotiv::geotiv)
 
@@ -82,7 +84,7 @@ export(EXPORT ${project_name}Targets
 
 
 # --------------------------------------------------------------------------------------------------
-if(FARMTRAX_BUILD_EXAMPLES)
+if(${project_name_upper}_BUILD_EXAMPLES)
   add_definitions(-DHAS_RERUN)
   set(RERUN_DOWNLOAD_AND_BUILD_ARROW OFF)
   FetchContent_Declare(rerun_sdk URL https://github.com/rerun-io/rerun/releases/latest/download/rerun_cpp_sdk.zip)
@@ -135,3 +137,28 @@ if(FARMTRAX_BUILD_EXAMPLES)
   )
 endif()
 
+
+# --------------------------------------------------------------------------------------------------
+if(${project_name_upper}_ENABLE_TESTS)
+  enable_testing()
+  add_definitions(-DENABLE_DOCTEST_IN_LIBRARY)
+  include(FetchContent)
+  FetchContent_Declare(
+    DocTest
+    GIT_REPOSITORY "https://github.com/onqtam/doctest"
+  )
+  FetchContent_MakeAvailable(DocTest)
+
+  file(GLOB test_src test/*.cpp)
+
+  foreach(src_file IN LISTS test_src)
+    get_filename_component(test_name "${src_file}" NAME_WE)
+    add_executable(${test_name} "${src_file}")
+      foreach(lib_file IN LISTS internal_deps)
+        target_compile_options(${test_name} PRIVATE ${params})
+        target_sources(${test_name} PRIVATE "${lib_file}")
+      endforeach()
+    target_link_libraries(${test_name} ${ext_deps} doctest_with_main)
+    add_test(NAME ${test_name} COMMAND ${test_name})
+  endforeach()
+endif()

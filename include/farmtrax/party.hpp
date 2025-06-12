@@ -1,6 +1,7 @@
 #pragma once
 
 #include "concord/concord.hpp"
+#include "concord/geometry/polygon/partition.hpp"
 #include "farmtrax/utils/utils.hpp"
 #include <boost/geometry.hpp>
 #include <boost/geometry/algorithms/area.hpp>

@@ -55,12 +55,12 @@ namespace farmtrax {
         // Constructor from vector of const Swaths (filters to only SwathType::Swath)
         explicit Nety(const std::vector<std::shared_ptr<const Swath>> &swaths) {
             // Filter to only include SwathType::Swath
-            for (const auto& swath : swaths) {
+            for (const auto &swath : swaths) {
                 if (swath->type == SwathType::Swath) {
                     swaths_.push_back(swath);
                 }
             }
-            
+
             ab_lines_.reserve(swaths_.size());
             for (size_t i = 0; i < swaths_.size(); ++i) {
                 ab_lines_.emplace_back(swaths_[i]->line.getStart(), swaths_[i]->line.getEnd(), swaths_[i]->uuid, i);
@@ -71,12 +71,12 @@ namespace farmtrax {
         // Constructor from vector of non-const Swaths (filters to only SwathType::Swath)
         explicit Nety(const std::vector<std::shared_ptr<Swath>> &swaths) {
             // Filter to only include SwathType::Swath
-            for (const auto& swath : swaths) {
+            for (const auto &swath : swaths) {
                 if (swath->type == SwathType::Swath) {
                     swaths_.push_back(swath); // implicit conversion to const
                 }
             }
-            
+
             ab_lines_.reserve(swaths_.size());
             for (size_t i = 0; i < swaths_.size(); ++i) {
                 ab_lines_.emplace_back(swaths_[i]->line.getStart(), swaths_[i]->line.getEnd(), swaths_[i]->uuid, i);
@@ -172,14 +172,14 @@ namespace farmtrax {
 
             // Convert vertex path to traversal order considering connection costs
             std::vector<std::pair<std::size_t, bool>> traversal_order = get_line_sequence_with_connections(path);
-            
+
             // Reorder and orient swaths according to shortest path
             reorder_swaths(traversal_order);
         }
 
         // Overload for concord::Point
         void shortest_path(std::shared_ptr<concord::Point> start = nullptr,
-                          std::shared_ptr<concord::Point> goal = nullptr) {
+                           std::shared_ptr<concord::Point> goal = nullptr) {
             concord::Point start_ptr, goal_ptr;
             if (!start) {
                 start_ptr = swaths_[0]->line.getStart();
@@ -236,8 +236,9 @@ namespace farmtrax {
         // Get line sequence from vertex path considering connection costs
         std::vector<std::pair<size_t, bool>> get_line_sequence_with_connections(const std::vector<Vertex> &path) const {
             std::vector<std::pair<size_t, bool>> sequence;
-            
-            if (path.empty()) return sequence;
+
+            if (path.empty())
+                return sequence;
 
             // Process path in pairs to identify line traversals
             for (size_t i = 0; i < path.size(); ++i) {
@@ -248,19 +249,21 @@ namespace farmtrax {
                     const double eps = 1e-6;
                     bool is_A_endpoint = boost::geometry::distance(point, ab_lines_[line_idx].A) < eps;
                     bool is_B_endpoint = boost::geometry::distance(point, ab_lines_[line_idx].B) < eps;
-                    
+
                     if (is_A_endpoint || is_B_endpoint) {
                         // Check if this is the start of a line traversal
                         if (i + 1 < path.size()) {
                             auto next_point = boost::get(boost::vertex_name, graph_)[path[i + 1]];
                             bool next_is_other_endpoint = false;
-                            
+
                             if (is_A_endpoint) {
-                                next_is_other_endpoint = boost::geometry::distance(next_point, ab_lines_[line_idx].B) < eps;
+                                next_is_other_endpoint =
+                                    boost::geometry::distance(next_point, ab_lines_[line_idx].B) < eps;
                             } else {
-                                next_is_other_endpoint = boost::geometry::distance(next_point, ab_lines_[line_idx].A) < eps;
+                                next_is_other_endpoint =
+                                    boost::geometry::distance(next_point, ab_lines_[line_idx].A) < eps;
                             }
-                            
+
                             // If next vertex is the other endpoint of the same line, this is a line traversal
                             if (next_is_other_endpoint) {
                                 sequence.emplace_back(line_idx, is_A_endpoint);
@@ -268,7 +271,7 @@ namespace farmtrax {
                                 break;
                             }
                         }
-                        
+
                         // If we reach here, this vertex is part of a connection, not a line traversal
                         break;
                     }
