@@ -1,5 +1,5 @@
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <thread>
 
 #include "concord/concord.hpp"
@@ -45,65 +45,65 @@ int main() {
 
     // === ADVANCED PARTITIONING DEMONSTRATION ===
     std::cout << "\n=== Advanced Field Partitioning Demo ===\n";
-    
+
     // 1. Test basic partitioning with default criteria
     std::cout << "1. Testing default partitioning criteria:\n";
-    farmtrax::Partitioner basic_partitioner(poly, datum);
+    concord::Partitioner basic_partitioner(poly, datum);
     auto basic_parts = basic_partitioner.partition(20000.0); // 2 hectares
     std::cout << "   - Default criteria: " << basic_parts.size() << " parts\n";
-    
+
     // 2. Test advanced multi-criteria partitioning
     std::cout << "\n2. Testing advanced multi-criteria partitioning:\n";
-    farmtrax::Partitioner advanced_partitioner(poly, datum);
-    
+    concord::Partitioner advanced_partitioner(poly, datum);
+
     // Configure strict criteria for agricultural optimization
-    farmtrax::Partitioner::PartitionCriteria strict_criteria;
-    strict_criteria.max_area = 50000.0;           // 0.8 hectares max for tight control
-    strict_criteria.min_convexity = 0.75;        // 75% convexity requirement
-    strict_criteria.max_aspect_ratio = 2.5;      // 2.5:1 max ratio for better machinery access
-    strict_criteria.min_bridge_width = 12.0;     // 12m minimum bridge width
-    strict_criteria.tooth_threshold = 0.2;       // 20% area threshold for teeth
+    concord::Partitioner::PartitionCriteria strict_criteria;
+    strict_criteria.max_area = 50000.0;      // 0.8 hectares max for tight control
+    strict_criteria.min_convexity = 0.75;    // 75% convexity requirement
+    strict_criteria.max_aspect_ratio = 2.5;  // 2.5:1 max ratio for better machinery access
+    strict_criteria.min_bridge_width = 12.0; // 12m minimum bridge width
+    strict_criteria.tooth_threshold = 0.2;   // 20% area threshold for teeth
     strict_criteria.enable_bridge_detection = true;
     strict_criteria.enable_tooth_detection = true;
     strict_criteria.enable_aspect_splitting = true;
-    strict_criteria.max_recursion_depth = 7;     // Allow deeper recursion for complex fields
-    
+    strict_criteria.max_recursion_depth = 7; // Allow deeper recursion for complex fields
+
     auto advanced_parts = advanced_partitioner.partition(8000.0, strict_criteria);
     std::cout << "   - Strict criteria: " << advanced_parts.size() << " parts\n";
-    
+
     // 3. Test different strategy combinations
     std::cout << "\n3. Testing individual partitioning strategies:\n";
-    
+
     // Bridge-only strategy
-    farmtrax::Partitioner::PartitionCriteria bridge_only;
-    bridge_only.max_area = 50000.0;              // Large area to focus on bridges
-    bridge_only.min_bridge_width = 8.0;          // Aggressive bridge detection
+    concord::Partitioner::PartitionCriteria bridge_only;
+    bridge_only.max_area = 50000.0;     // Large area to focus on bridges
+    bridge_only.min_bridge_width = 8.0; // Aggressive bridge detection
     bridge_only.enable_bridge_detection = true;
     bridge_only.enable_tooth_detection = false;
     bridge_only.enable_aspect_splitting = false;
-    
-    farmtrax::Partitioner bridge_partitioner(poly, datum);
+
+    concord::Partitioner bridge_partitioner(poly, datum);
     auto bridge_parts = bridge_partitioner.partition(50000.0, bridge_only);
     std::cout << "   - Bridge-only strategy: " << bridge_parts.size() << " parts\n";
-    
+
     // Shape quality strategy
-    farmtrax::Partitioner::PartitionCriteria shape_quality;
+    concord::Partitioner::PartitionCriteria shape_quality;
     shape_quality.max_area = 50000.0;
-    shape_quality.min_convexity = 0.85;          // Very strict convexity
-    shape_quality.max_aspect_ratio = 2.0;        // Compact shapes only
+    shape_quality.min_convexity = 0.85;   // Very strict convexity
+    shape_quality.max_aspect_ratio = 2.0; // Compact shapes only
     shape_quality.enable_bridge_detection = false;
     shape_quality.enable_tooth_detection = true;
     shape_quality.enable_aspect_splitting = true;
-    
-    farmtrax::Partitioner shape_partitioner(poly, datum);
+
+    concord::Partitioner shape_partitioner(poly, datum);
     auto shape_parts = shape_partitioner.partition(50000.0, shape_quality);
     std::cout << "   - Shape quality strategy: " << shape_parts.size() << " parts\n";
-    
+
     std::cout << "\n4. Creating field with optimal partitioning:\n";
     // Use the advanced partitioning for the actual field processing
     farmtrax::Field field(poly, 0.1, datum, true, 0.7, 8000.0); // Use strict 0.8 hectare threshold
     std::cout << "   - Field created with " << field.get_parts().size() << " optimally partitioned parts\n";
-    
+
     field.add_noise();
 
     // geotiv::Layer layer;
@@ -175,15 +175,15 @@ int main() {
 
     for (size_t f = 0; f < field.get_parts().size(); f++) {
         std::cout << "\n--- Processing Field Part " << (f + 1) << " of " << part_cnt << " ---\n";
-        
-        const auto& part = field.get_parts()[f];
+
+        const auto &part = field.get_parts()[f];
         std::cout << "Part " << (f + 1) << " statistics:\n";
         std::cout << "  - Headland rings: " << part.headlands.size() << "\n";
         std::cout << "  - Work swaths: " << part.swaths.size() << "\n";
-        
+
         // Calculate part area for partitioning validation
         auto part_area = boost::geometry::area(part.border.b_polygon);
-        std::cout << "  - Calculated area: " << std::fixed << std::setprecision(1) << part_area << " sq.m (" 
+        std::cout << "  - Calculated area: " << std::fixed << std::setprecision(1) << part_area << " sq.m ("
                   << (part_area / 10000.0) << " hectares)\n";
 
         auto fieldPtr = std::make_shared<farmtrax::Part>(field.get_parts()[f]);
