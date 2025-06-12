@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.2.0] - 2025-06-12
+
+### <!-- 0 -->⛰️  Features
+
+- Use concord's polygon partitioner
+- Docs: Explain and exemplify new partitioning
+- Implement advanced multi-criteria field partitioning
+- Add obstacle avoidance to Rerun visualization
+- Implement basic obstacle avoidance functionality
+- Generate and visualize connections between swaths
+- Per-indivifual parts v3
+- Per-indivifual parts v2
+- Improve swath traversal and reordering logic
+- Return swathsh instead of vertices
+- Per-indivifual parts
+- Use intial point automatically (still some segfault though)
+- Initial swath return support for nety
+- Refactor geometry constructors and simplify usage
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Stupid pointer issue with intil point for graph
+
+### <!-- 2 -->🚜 Refactor
+
+- Refactor Swath representation and handling
+
+### <!-- 6 -->🧪 Testing
+
+- Improve Geometry Utility Testing and Formatting
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Fix gitignore entry for compile commands
+- Ignore compile_commands.json
+
+### Build
+
+- Refactor build system and code style
+
 ## [0.1.2] - 2025-05-30
 
 ### <!-- 0 -->⛰️  Features
