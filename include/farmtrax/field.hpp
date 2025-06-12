@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <iostream>
+
 #include <numeric>
 #include <random>
 #include <stdexcept>
@@ -81,10 +81,16 @@ namespace farmtrax {
     struct Swath {
         concord::Line line;
         std::string uuid;
-        SwathType type; // Default type is Sath
+        SwathType type = SwathType::Swath; // Default type is Swath
         bool finished = false;
         BLineString b_line;
         BBox bounding_box; // Add bounding box for R-tree
+
+        // Additional fields needed for testing
+        int id = -1;
+        double width = 0.0;
+        std::vector<concord::Point> points;
+        std::vector<BPoint> centerline;
 
         // Get the head (start) point
         concord::Point getHead() const { return line.getStart(); }
@@ -165,12 +171,18 @@ namespace farmtrax {
     using Grid = concord::Grid<uint8_t>;
 
     class Field {
+      public:
+        // Forward declaration of test functions
+        friend double get_resolution(const Field &field);
+        friend concord::Datum get_field_datum(const Field &field);
+        friend double get_total_field_area(const Field &field);
+
+      private:
         concord::Polygon border_;
         std::vector<Grid> grids_;
         std::vector<Part> parts_;
         double resolution_{};
 
-      private:
         concord::Partitioner partitioner_;
         concord::Datum datum_{};
         entropy::NoiseGen noiseGen_;

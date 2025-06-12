@@ -29,6 +29,68 @@ namespace farmtrax {
             return static_cast<uint8_t>(std::round(clamped));
         }
 
+        // Calculate distance from a point to a line segment
+        inline double point_to_line_distance(const BPoint &point, const BPoint &line_start, const BPoint &line_end) {
+            // If line is a point, return distance to that point
+            if (boost::geometry::equals(line_start, line_end)) {
+                return boost::geometry::distance(point, line_start);
+            }
+
+            // Vector from line_start to line_end
+            double line_vec_x = boost::geometry::get<0>(line_end) - boost::geometry::get<0>(line_start);
+            double line_vec_y = boost::geometry::get<1>(line_end) - boost::geometry::get<1>(line_start);
+
+            // Vector from line_start to point
+            double point_vec_x = boost::geometry::get<0>(point) - boost::geometry::get<0>(line_start);
+            double point_vec_y = boost::geometry::get<1>(point) - boost::geometry::get<1>(line_start);
+
+            // Length of line segment squared
+            double line_len_squared = line_vec_x * line_vec_x + line_vec_y * line_vec_y;
+
+            // Calculate projection of point onto line
+            double t = (point_vec_x * line_vec_x + point_vec_y * line_vec_y) / line_len_squared;
+
+            // If projection is outside the line segment, return distance to the nearest endpoint
+            if (t < 0.0)
+                return boost::geometry::distance(point, line_start);
+            if (t > 1.0)
+                return boost::geometry::distance(point, line_end);
+
+            // Calculate the projected point on the line
+            BPoint projected_point(boost::geometry::get<0>(line_start) + t * line_vec_x,
+                                   boost::geometry::get<1>(line_start) + t * line_vec_y);
+
+            // Return distance from point to projected point
+            return boost::geometry::distance(point, projected_point);
+        }
+
+        // Calculate angle between two vectors represented as BPoints (relative to origin)
+        inline double angle_between(const BPoint &v1, const BPoint &v2) {
+            // Extract vector components
+            double v1_x = boost::geometry::get<0>(v1);
+            double v1_y = boost::geometry::get<1>(v1);
+            double v2_x = boost::geometry::get<0>(v2);
+            double v2_y = boost::geometry::get<1>(v2);
+
+            // Calculate magnitudes
+            double v1_mag = std::sqrt(v1_x * v1_x + v1_y * v1_y);
+            double v2_mag = std::sqrt(v2_x * v2_x + v2_y * v2_y);
+
+            // Prevent division by zero
+            if (v1_mag < 1e-10 || v2_mag < 1e-10) {
+                return 0.0; // One of the vectors is zero-length
+            }
+
+            // Calculate dot product and normalize
+            double dot_product = (v1_x * v2_x + v1_y * v2_y) / (v1_mag * v2_mag);
+
+            // Ensure dot product is within valid range for acos
+            dot_product = std::clamp(dot_product, -1.0, 1.0);
+
+            // Return angle in radians
+            return std::acos(dot_product);
+        }
+
         inline bool are_colinear(const concord::Point &p1, const concord::Point &p2, const concord::Point &p3,
                                  double epsilon = 1e-10) {
             using BPoint = boost::geometry::model::d2::point_xy<double>;

@@ -1,5 +1,5 @@
-#include <iostream>
 #include <iomanip>
+#include <iostream>
 #include <thread>
 
 #include "concord/concord.hpp"
@@ -45,13 +45,13 @@ int main() {
 
     // === FIELD PARTITIONING ===
     std::cout << "\n=== Field Partitioning by Area ===\n";
-    
+
     // Test area-based partitioning with different thresholds
     std::cout << "Testing different area thresholds:\n";
-       
+
     farmtrax::Field field(poly, 0.1, datum, true, 0.7, 50000.0);
     std::cout << "Field partitioned into " << field.get_parts().size() << " manageable parts\n";
-    
+
     field.add_noise();
 
     // geotiv::Layer layer;
@@ -123,15 +123,13 @@ int main() {
 
     for (size_t f = 0; f < field.get_parts().size(); f++) {
         std::cout << "\n--- Processing Field Part " << (f + 1) << " of " << part_cnt << " ---\n";
-        
-        const auto& part = field.get_parts()[f];
-        
+
+        const auto &part = field.get_parts()[f];
+
         // Calculate part area to show partitioning effectiveness
         auto part_area = boost::geometry::area(part.border.b_polygon);
-        std::cout << "Part " << (f + 1) << ": " 
-                  << std::fixed << std::setprecision(1) << part_area << " sq.m (" 
-                  << (part_area / 10000.0) << " hectares), "
-                  << part.headlands.size() << " headlands, " 
+        std::cout << "Part " << (f + 1) << ": " << std::fixed << std::setprecision(1) << part_area << " sq.m ("
+                  << (part_area / 10000.0) << " hectares), " << part.headlands.size() << " headlands, "
                   << part.swaths.size() << " swaths\n";
 
         auto fieldPtr = std::make_shared<farmtrax::Part>(field.get_parts()[f]);
