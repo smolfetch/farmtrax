@@ -345,55 +345,115 @@ namespace farmtrax {
 
       private:
         std::vector<Ring> generate_headlands(const concord::Polygon &polygon, double shrink_dist, int count) const {
-            if (shrink_dist <= 0 || count <= 0)
-                return {};
+            // Quick input validation
+            if (count <= 0)
+                return {}; // No headlands requested
+
             if (shrink_dist < 0)
                 throw std::invalid_argument("negative shrink");
 
-            std::vector<Ring> H;
-            BPolygon base = utils::to_boost(polygon);
+            // Ensure shrink distance is positive
+            double actual_shrink_dist = std::max(0.1, shrink_dist);
 
+            // Initialize result vector
+            std::vector<Ring> H;
+
+            // Ensure the polygon has points
+            if (polygon.getPoints().size() < 3) {
+                std::cerr << "Warning: Invalid polygon for headland generation" << std::endl;
+                return H;
+            }
+
+            // Convert to boost polygon with careful error handling
+            BPolygon base;
+            try {
+                base = utils::to_boost(polygon);
+                if (base.outer().size() < 3) {
+                    std::cerr << "Warning: Invalid boost polygon for headland generation" << std::endl;
+                    return H;
+                }
+            } catch (const std::exception &e) {
+                std::cerr << "Boost conversion error: " << e.what() << std::endl;
+                return H;
+            }
+
+            // Generate each headland as a shrunken version of the previous one
             for (int i = 0; i < count; ++i) {
-                BPolygon current = (i == 0 ? base : utils::to_boost(H.back().polygon));
+                // Get the current polygon to shrink (either the base field or the last headland)
+                BPolygon current;
+                try {
+                    current = (i == 0 ? base : utils::to_boost(H.back().polygon));
+                } catch (const std::exception &e) {
+                    std::cerr << "Error getting polygon for headland " << i << ": " << e.what() << std::endl;
+                    break;
+                }
+
+                // Set up buffer operation parameters
                 boost::geometry::model::multi_polygon<BPolygon> buf;
-                boost::geometry::strategy::buffer::distance_symmetric<double> dist(-shrink_dist);
+                boost::geometry::strategy::buffer::distance_symmetric<double> dist(-actual_shrink_dist);
                 boost::geometry::strategy::buffer::side_straight side;
                 boost::geometry::strategy::buffer::join_miter join;
                 boost::geometry::strategy::buffer::end_flat end;
                 boost::geometry::strategy::buffer::point_square point;
 
+                // Attempt to buffer (shrink) the polygon
                 try {
                     boost::geometry::buffer(current, buf, dist, side, join, end, point);
                 } catch (const std::exception &e) {
-                    std::cerr << "Buffer operation failed: " << e.what() << std::endl;
+                    std::cerr << "Buffer operation failed for headland " << i << ": " << e.what() << std::endl;
                     break;
                 }
 
+                // Check if buffer operation produced any results
                 if (buf.empty()) {
                     std::cerr << "Warning: empty buffer result at headland " << i << std::endl;
+                    // Instead of breaking, we can return what we have so far
                     break;
                 }
 
-                const BPolygon *best = &buf.front();
-                double maxA = boost::geometry::area(*best);
-                for (auto const &cand : buf) {
-                    double a = boost::geometry::area(cand);
-                    if (a > maxA) {
-                        maxA = a;
-                        best = &cand;
+                // Find the polygon with the largest area (likely the main interior)
+                const BPolygon *best = nullptr;
+                double maxA = -std::numeric_limits<double>::max();
+
+                for (const auto &cand : buf) {
+                    try {
+                        double a = std::abs(boost::geometry::area(cand)); // Use absolute area
+                        if (a > maxA && a > 0.0001) {                     // Ensure minimum area
+                            maxA = a;
+                            best = &cand;
+                        }
+                    } catch (const std::exception &e) {
+                        std::cerr << "Area calculation error: " << e.what() << std::endl;
+                        continue;
                     }
                 }
 
-                if (maxA <= 0) {
-                    std::cerr << "Warning: zero area polygon at headland " << i << std::endl;
+                // Check if we found a valid polygon
+                if (!best || maxA <= 0.0001) {
+                    std::cerr << "Warning: no valid polygon found at headland " << i << std::endl;
                     break;
                 }
 
-                concord::Polygon tmp = utils::from_boost(*best, datum_);
-                concord::Polygon simp = utils::remove_colinear_points(tmp, 1e-4);
-                simp.addPoint(simp.getPoints().front());
+                try {
+                    // Convert back to concord polygon
+                    concord::Polygon tmp = utils::from_boost(*best, datum_);
 
-                H.push_back(create_ring(std::move(simp)));
+                    // Clean up the polygon by removing colinear points
+                    concord::Polygon simp = utils::remove_colinear_points(tmp, 1e-4);
+
+                    // Ensure polygon is closed
+                    if (!simp.getPoints().empty() &&
+                        (simp.getPoints().front().enu.x != simp.getPoints().back().enu.x ||
+                         simp.getPoints().front().enu.y != simp.getPoints().back().enu.y)) {
+                        simp.addPoint(simp.getPoints().front());
+                    }
+
+                    // Create a ring from the polygon and add to results
+                    H.push_back(create_ring(std::move(simp)));
+                } catch (const std::exception &e) {
+                    std::cerr << "Error creating headland " << i << ": " << e.what() << std::endl;
+                    break;
+                }
             }
             return H;
         }

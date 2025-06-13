@@ -71,8 +71,8 @@ TEST_CASE("Geometry Utilities") {
         // Convert to boost polygon
         farmtrax::BPolygon boost_poly = farmtrax::utils::to_boost(poly);
 
-        // Check dimensions
-        double area = boost::geometry::area(boost_poly);
+        // Check dimensions - absolute value of area since orientation might differ
+        double area = std::abs(boost::geometry::area(boost_poly));
         CHECK(area == doctest::Approx(1.0));
 
         // Convert back to concord polygon

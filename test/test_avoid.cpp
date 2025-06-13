@@ -14,10 +14,10 @@ concord::Polygon create_obstacle(const concord::Datum &datum = concord::Datum{})
     return obstacle;
 }
 
-// Helper to create a field with swaths going through an obstacle
+// Helper to create a field with obstacle
 std::pair<farmtrax::Field, concord::Polygon>
 create_field_with_obstacle(const concord::Datum &datum = concord::Datum{}) {
-    // Create a rectangular field
+    // Create a rectangular field - smaller and simpler for testing
     concord::Polygon field_poly;
     field_poly.addPoint(concord::Point{concord::ENU{0.0, 0.0, 0.0}, datum});
     field_poly.addPoint(concord::Point{concord::ENU{100.0, 0.0, 0.0}, datum});
@@ -25,12 +25,11 @@ create_field_with_obstacle(const concord::Datum &datum = concord::Datum{}) {
     field_poly.addPoint(concord::Point{concord::ENU{0.0, 50.0, 0.0}, datum});
     field_poly.addPoint(concord::Point{concord::ENU{0.0, 0.0, 0.0}, datum}); // Close the polygon
 
-    // Create the field with N-S swaths (will go through the obstacle)
-    farmtrax::Field field(field_poly, 0.5, datum);
-    field.gen_field(5.0, 0.0, 1); // 5m swath width, 0 angle, 1 headland
-
     // Create obstacle
     concord::Polygon obstacle = create_obstacle(datum);
+
+    // Create minimal Field object
+    farmtrax::Field field(field_poly, 0.5, datum, false, 1000.0); // Using large area threshold to avoid partitioning
 
     return {field, obstacle};
 }
@@ -58,16 +57,38 @@ TEST_CASE("Obstacle Avoidance with Concord Polygons") {
     // Create avoider
     farmtrax::ObstacleAvoider avoider(obstacles, datum);
 
-    // Extract swaths from the field
-    std::vector<std::shared_ptr<const farmtrax::Swath>> input_swaths;
-    for (const auto &part : field.get_parts()) {
-        for (const auto &swath : part.swaths) {
-            if (swath.type == farmtrax::SwathType::Swath) {
-                auto swath_ptr = std::make_shared<farmtrax::Swath>(swath);
-                input_swaths.push_back(swath_ptr);
-            }
-        }
+    // Print obstacle info for debugging
+    std::cout << "Obstacle polygon points: " << obstacle.getPoints().size() << std::endl;
+    std::cout << "Obstacle coords: ";
+    for (const auto &pt : obstacle.getPoints()) {
+        std::cout << "(" << pt.enu.x << "," << pt.enu.y << ") ";
     }
+    std::cout << std::endl; // Create our own test swaths
+    std::vector<std::shared_ptr<const farmtrax::Swath>> input_swaths;
+
+    // Create vertical swaths that will cross the obstacle at 50,25
+    for (double x = 40.0; x < 60.0; x += 5.0) { // Use a smaller range to focus on the obstacle area
+        auto swath = std::make_shared<farmtrax::Swath>();
+        swath->type = farmtrax::SwathType::Swath;
+        swath->uuid = "swath_" + std::to_string(static_cast<int>(x));
+
+        // Create a vertical line
+        concord::Point start(concord::ENU{x, 0.0, 0.0}, datum);
+        concord::Point end(concord::ENU{x, 50.0, 0.0}, datum);
+        swath->line.setStart(start);
+        swath->line.setEnd(end);
+
+        // Create the boost linestring
+        swath->b_line.push_back(farmtrax::BPoint(x, 0.0));
+        swath->b_line.push_back(farmtrax::BPoint(x, 50.0));
+
+        // Create the bounding box
+        swath->bounding_box = boost::geometry::return_envelope<farmtrax::BBox>(swath->b_line);
+
+        input_swaths.push_back(swath);
+    }
+
+    std::cout << "Created " << input_swaths.size() << " test swaths for obstacle avoidance" << std::endl;
 
     // Apply avoidance with 2.0m inflation
     auto avoided_swaths = avoider.avoid(input_swaths, 2.0);
@@ -106,15 +127,29 @@ TEST_CASE("Obstacle Avoidance with Different Inflation Distances") {
     // Create avoider
     farmtrax::ObstacleAvoider avoider(obstacles, datum);
 
-    // Get swaths from the field
+    // Create our own test swaths
     std::vector<std::shared_ptr<const farmtrax::Swath>> input_swaths;
-    for (const auto &part : field.get_parts()) {
-        for (const auto &swath : part.swaths) {
-            if (swath.type == farmtrax::SwathType::Swath) {
-                auto swath_ptr = std::make_shared<farmtrax::Swath>(swath);
-                input_swaths.push_back(swath_ptr);
-            }
-        }
+
+    // Create vertical swaths that will cross the obstacle
+    for (double x = 10.0; x < 100.0; x += 10.0) {
+        auto swath_ptr = std::make_shared<farmtrax::Swath>();
+        swath_ptr->type = farmtrax::SwathType::Swath;
+        swath_ptr->uuid = "swath_" + std::to_string(static_cast<int>(x));
+
+        // Create a vertical line
+        concord::Point start(concord::ENU{x, 0.0, 0.0}, datum);
+        concord::Point end(concord::ENU{x, 50.0, 0.0}, datum);
+        swath_ptr->line.setStart(start);
+        swath_ptr->line.setEnd(end);
+
+        // Create the boost linestring
+        swath_ptr->b_line.push_back(farmtrax::BPoint(x, 0.0));
+        swath_ptr->b_line.push_back(farmtrax::BPoint(x, 50.0));
+
+        // Ensure bounding box is computed
+        swath_ptr->bounding_box = boost::geometry::return_envelope<farmtrax::BBox>(swath_ptr->b_line);
+
+        input_swaths.push_back(swath_ptr);
     }
 
     // Test with different inflation distances

@@ -103,8 +103,19 @@ TEST_CASE("Field Traversal Optimization") {
     // Get the optimized swaths
     auto optimized_swaths = nety.get_swaths();
 
-    // Check that the number of swaths is preserved
-    CHECK(optimized_swaths.size() == const_swaths.size());
+    // The optimized swaths will include the original swaths plus connection swaths
+    // so its size will be larger than the original count
+    CHECK(optimized_swaths.size() >= const_swaths.size());
+
+    // Count how many of the optimized swaths are actual working swaths vs connection swaths
+    size_t working_swaths_count = 0;
+    for (const auto &swath : optimized_swaths) {
+        if (swath->type == farmtrax::SwathType::Swath) {
+            working_swaths_count++;
+        }
+    }
+    // Check that the number of working swaths equals the original count
+    CHECK(working_swaths_count == const_swaths.size());
 
     // Check that each original swath is still present (but potentially reordered)
     for (const auto &original : const_swaths) {

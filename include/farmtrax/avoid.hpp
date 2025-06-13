@@ -44,7 +44,15 @@ namespace farmtrax {
 
             std::vector<std::shared_ptr<Swath>> result_swaths;
 
+            // Skip processing if no input swaths
+            if (input_swaths.empty()) {
+                return result_swaths;
+            }
+
             for (const auto &swath : input_swaths) {
+                if (!swath)
+                    continue; // Skip null swaths
+
                 auto processed_swaths = process_swath(swath);
                 result_swaths.insert(result_swaths.end(), processed_swaths.begin(), processed_swaths.end());
             }
@@ -124,13 +132,26 @@ namespace farmtrax {
         std::vector<std::shared_ptr<Swath>> process_swath(const std::shared_ptr<const Swath> &swath) {
             std::vector<std::shared_ptr<Swath>> result;
 
+            // Guard against null or invalid swaths
+            if (!swath || swath->b_line.empty() || swath->b_line.size() < 2) {
+                // Return a default empty result if swath is invalid
+                return result;
+            }
+
             // Check if swath intersects with any inflated obstacle
             bool intersects = false;
             std::vector<BLineString> cut_segments;
 
+            std::cout << "Processing swath with " << swath->b_line.size() << " b_line points" << std::endl;
+            std::cout << "Number of inflated obstacles: " << inflated_obstacles_.size() << std::endl;
+
             for (const auto &inflated_obstacle : inflated_obstacles_) {
-                if (boost::geometry::touches(swath->b_line, inflated_obstacle) ||
-                    boost::geometry::intersects(swath->b_line, inflated_obstacle)) {
+                bool touches = boost::geometry::touches(swath->b_line, inflated_obstacle);
+                bool intersects_geom = boost::geometry::intersects(swath->b_line, inflated_obstacle);
+                std::cout << "Touches obstacle: " << (touches ? "yes" : "no")
+                          << ", Intersects: " << (intersects_geom ? "yes" : "no") << std::endl;
+
+                if (touches || intersects_geom) {
                     intersects = true;
 
                     // Cut the swath by subtracting the inflated obstacle
@@ -191,9 +212,28 @@ namespace farmtrax {
         // Sort segments by their position along the original swath direction
         void sort_segments_by_position(std::vector<BLineString> &segments,
                                        const std::shared_ptr<const Swath> &original_swath) const {
+            // Check if the swath and its line are valid
+            if (!original_swath) {
+                return; // Guard against null pointer
+            }
+
             BPoint start_point(original_swath->line.getStart().enu.x, original_swath->line.getStart().enu.y);
 
+            // Filter out empty or invalid segments
+            segments.erase(
+                std::remove_if(segments.begin(), segments.end(),
+                               [](const BLineString &segment) { return segment.empty() || segment.size() < 2; }),
+                segments.end());
+
+            if (segments.empty()) {
+                return; // No segments to sort
+            }
+
             std::sort(segments.begin(), segments.end(), [&start_point](const BLineString &a, const BLineString &b) {
+                // Check if segments are valid
+                if (a.empty() || b.empty()) {
+                    return false;
+                }
                 double dist_a = boost::geometry::distance(start_point, a.front());
                 double dist_b = boost::geometry::distance(start_point, b.front());
                 return dist_a < dist_b;
