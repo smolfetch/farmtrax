@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.1] - 2025-06-13
+
+### <!-- 6 -->🧪 Testing
+
+- Refine field geometry handling and testing
+
 ## [0.2.0] - 2025-06-12
 
 ### <!-- 0 -->⛰️  Features
