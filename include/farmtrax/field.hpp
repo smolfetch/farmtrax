@@ -191,8 +191,8 @@ namespace farmtrax {
 
       public:
         Field(const concord::Polygon &border, double resolution, const concord::Datum &datum, bool centred = true,
-              double overlap_threshold = 0.7, double area_threshold = 0.5)
-            : resolution_(resolution), border_(border), datum_(datum), overlap_threshold_(overlap_threshold) {
+              double area_threshold = 0.5)
+            : resolution_(resolution), border_(border), datum_(datum) {
             grids_.emplace_back(border_, resolution_, datum_, centred);
             partitioner_ = concord::Partitioner(border_);
             auto divisions = partitioner_.partition(area_threshold);
@@ -476,7 +476,7 @@ namespace farmtrax {
 
             std::vector<Swath> out;
             BPolygon bounds = utils::to_boost(border);
-            
+
             // Ensure polygon is valid and correctly oriented
             if (!boost::geometry::is_valid(bounds)) {
                 std::cout << "Warning: Invalid polygon, attempting to correct" << std::endl;
@@ -486,11 +486,11 @@ namespace farmtrax {
                     return out;
                 }
             }
-            
+
             // Debug: Check polygon area and orientation
             double area = boost::geometry::area(bounds);
             std::cout << "Polygon area: " << area << " (should be positive for correct orientation)" << std::endl;
-            
+
             double rad = angle_deg * M_PI / 180.0;
             BPoint centroid;
             boost::geometry::centroid(bounds, centroid);
@@ -501,14 +501,13 @@ namespace farmtrax {
             auto bbox = boost::geometry::return_envelope<boost::geometry::model::box<BPoint>>(bounds);
             double width = bbox.max_corner().x() - bbox.min_corner().x();
             double height = bbox.max_corner().y() - bbox.min_corner().y();
-            
+
             // Use more reasonable bounds for line generation
-            double line_ext = std::max(width, height) * 1.5; // Extension for lines
+            double line_ext = std::max(width, height) * 1.5;    // Extension for lines
             double max_offset = std::max(width, height) * 0.75; // Maximum offset from center
-            
-            std::cout << "Generating swaths: centroid=(" << cx << "," << cy 
-                      << "), angle=" << angle_deg << "°, line_ext=" << line_ext 
-                      << ", max_offset=" << max_offset << std::endl;
+
+            std::cout << "Generating swaths: centroid=(" << cx << "," << cy << "), angle=" << angle_deg
+                      << "°, line_ext=" << line_ext << ", max_offset=" << max_offset << std::endl;
 
             int swath_count = 0;
             for (double offs = -max_offset; offs <= max_offset; offs += swath_width) {
@@ -531,7 +530,7 @@ namespace farmtrax {
                     out.push_back(create_swath(a, b, SwathType::Swath));
                 }
             }
-            
+
             std::cout << "Generated " << swath_count << " swaths inside polygon" << std::endl;
 
             return out;

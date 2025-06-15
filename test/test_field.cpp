@@ -64,7 +64,7 @@ TEST_CASE("Field Partitioning") {
 
     // Create a field with partitioning parameters
     double area_threshold = 1000.0; // Small enough to force partitioning of our 5000 sq.m field
-    farmtrax::Field field(poly, 0.5, datum, true, 0.7, area_threshold);
+    farmtrax::Field field(poly, 0.5, datum, true, area_threshold);
 
     // Verify that field was partitioned
     CHECK(field.get_parts().size() > 1);

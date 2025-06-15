@@ -29,9 +29,6 @@ int main() {
     try {
         auto fc = geoson::ReadFeatureCollection("misc/field4.geojson");
         datum = fc.datum; // Use the datum from the GeoJSON file
-        std::cout << "Using datum from GeoJSON: lat=" << datum.lat << ", lon=" << datum.lon << ", alt=" << datum.alt
-                  << std::endl;
-
         for (auto &f : fc.features) {
             if (std::get_if<concord::Polygon>(&f.geometry)) {
                 poly = std::get<concord::Polygon>(f.geometry);
@@ -43,23 +40,7 @@ int main() {
         return 1;
     }
 
-    // Calculate field bounds first
-    double min_x = std::numeric_limits<double>::max();
-    double max_x = std::numeric_limits<double>::lowest();
-    double min_y = std::numeric_limits<double>::max();
-    double max_y = std::numeric_limits<double>::lowest();
-
-    for (const auto &point : poly.getPoints()) {
-        min_x = std::min(min_x, point.x);
-        max_x = std::max(max_x, point.x);
-        min_y = std::min(min_y, point.y);
-        max_y = std::max(max_y, point.y);
-        std::cout << "x: " << point.x << ", y: " << point.y << ", z: " << point.z << "\n";
-    }
-
-    std::cout << "Field bounds: x[" << min_x << ", " << max_x << "], y[" << min_y << ", " << max_y << "]\n";
-
-    farmtrax::Field field(poly, 0.1, datum, true, 0.7, 50000.0);
+    farmtrax::Field field(poly, 0.1, datum, true, 50000.0);
 
     field.add_noise();
 

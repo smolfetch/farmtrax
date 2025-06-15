@@ -105,10 +105,9 @@ if(${project_name_upper}_BUILD_EXAMPLES)
   include_directories(${Boost_INCLUDE_DIRS})
   list(APPEND sys_deps ${Boost_LIBRARIES})
   
-  set(exe
-    examples/main.cpp
-    examples/advanced_partitioning_example.cpp
-  )
+
+  file(GLOB exe examples/*.cpp)
+
   # ----------------------------------------------
   set(exec_names)
   foreach(src_file IN LISTS exe)
