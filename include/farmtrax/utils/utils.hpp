@@ -122,7 +122,7 @@ namespace farmtrax {
         inline BPoint to_boost(const concord::Point &in) { return BPoint{in.x, in.y}; }
 
         inline concord::Point from_boost(const BPoint &in, const concord::Datum &datum = concord::Datum{}) {
-            return concord::Point{in.x(), in.y(), 0.0};
+            return concord::Point{boost::geometry::get<0>(in), boost::geometry::get<1>(in), 0.0};
         }
 
         inline BLineString to_boost(const concord::Line &L) {
@@ -177,8 +177,11 @@ namespace farmtrax {
                 return out; // Empty polygon
 
             // Compare using coordinate values directly instead of boost::geometry::equals
-            size_t limit = (n > 1 && std::abs(poly.outer().front().x() - poly.outer().back().x()) < 1e-10 &&
-                            std::abs(poly.outer().front().y() - poly.outer().back().y()) < 1e-10)
+            size_t limit = (n > 1 &&
+                            std::abs(boost::geometry::get<0>(poly.outer().front()) -
+                                     boost::geometry::get<0>(poly.outer().back())) < 1e-10 &&
+                            std::abs(boost::geometry::get<1>(poly.outer().front()) -
+                                     boost::geometry::get<1>(poly.outer().back())) < 1e-10)
                                ? n - 1
                                : n;
 

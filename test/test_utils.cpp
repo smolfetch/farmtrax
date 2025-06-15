@@ -81,12 +81,22 @@ TEST_CASE("Geometry Utilities") {
         // Check the points are preserved
         CHECK(converted_poly.getPoints().size() == poly.getPoints().size());
 
-        // Check specific points
+        // Check that all original points exist in the converted polygon (order may differ due to
+        // boost::geometry::correct())
         const auto &original_pts = poly.getPoints();
         const auto &converted_pts = converted_poly.getPoints();
-        for (size_t i = 0; i < std::min(original_pts.size(), converted_pts.size()); ++i) {
-            CHECK(original_pts[i].x == doctest::Approx(converted_pts[i].x));
-            CHECK(original_pts[i].y == doctest::Approx(converted_pts[i].y));
+
+        // For each original point, check if it exists in the converted polygon
+        for (size_t i = 0; i < original_pts.size(); ++i) {
+            bool found = false;
+            for (size_t j = 0; j < converted_pts.size(); ++j) {
+                if (std::abs(original_pts[i].x - converted_pts[j].x) < 1e-10 &&
+                    std::abs(original_pts[i].y - converted_pts[j].y) < 1e-10) {
+                    found = true;
+                    break;
+                }
+            }
+            CHECK(found);
         }
     }
 }

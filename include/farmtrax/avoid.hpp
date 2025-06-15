@@ -142,9 +142,6 @@ namespace farmtrax {
             bool intersects = false;
             std::vector<BLineString> cut_segments;
 
-            std::cout << "Processing swath with " << swath->b_line.size() << " b_line points" << std::endl;
-            std::cout << "Number of inflated obstacles: " << inflated_obstacles_.size() << std::endl;
-
             for (const auto &inflated_obstacle : inflated_obstacles_) {
                 bool touches = boost::geometry::touches(swath->b_line, inflated_obstacle);
                 bool intersects_geom = boost::geometry::intersects(swath->b_line, inflated_obstacle);

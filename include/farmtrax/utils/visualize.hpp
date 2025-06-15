@@ -20,16 +20,17 @@ namespace farmtrax {
                 std::vector<std::array<float, 3>> pts;
                 for (auto const &p : field.get_parts()[i].border.polygon.getPoints())
                     pts.push_back({float(p.x), float(p.y), 0.0f});
-                rec->log_static("/border" + std::to_string(i), rerun::LineStrips3D(rerun::components::LineStrip3D(pts))
-                                                                   .with_colors({{rerun::Color(120, 70, 70)}})
-                                                                   .with_radii({{0.2f}}));
+                rec->log_static("/field/part" + std::to_string(i) + "/border",
+                                rerun::LineStrips3D(rerun::components::LineStrip3D(pts))
+                                    .with_colors({{rerun::Color(120, 70, 70)}})
+                                    .with_radii({{0.2f}}));
             }
             for (size_t i = 0; i < field.get_parts().size(); ++i) {
                 for (size_t j = 0; j < field.get_parts()[i].headlands.size(); ++j) {
                     std::vector<std::array<float, 3>> pts;
                     for (auto const &p : field.get_parts()[i].headlands[j].polygon.getPoints())
                         pts.push_back({float(p.x), float(p.y), 0.0f});
-                    rec->log_static("/headland" + std::to_string(i) + "_" + std::to_string(j),
+                    rec->log_static("/field/part" + std::to_string(i) + "/headland" + std::to_string(j),
                                     rerun::LineStrips3D(rerun::components::LineStrip3D(pts))
                                         .with_colors({{rerun::Color(70, 120, 70)}})
                                         .with_radii({{0.2f}}));
@@ -41,7 +42,7 @@ namespace farmtrax {
                     std::vector<std::array<float, 3>> pts = {
                         {float(s.line.getStart().x), float(s.line.getStart().y), 0.0f},
                         {float(s.line.getEnd().x), float(s.line.getEnd().y), 0.0f}};
-                    rec->log_static("/swath" + std::to_string(i) + "_" + std::to_string(j),
+                    rec->log_static("/field/part" + std::to_string(i) + "/swath" + std::to_string(j),
                                     rerun::LineStrips3D(rerun::components::LineStrip3D(pts))
                                         .with_colors({{rerun::Color(70, 70, 120)}})
                                         .with_radii({{0.2f}}));
@@ -78,6 +79,46 @@ namespace farmtrax {
                         {float(sw_ptr->line.getStart().x), float(sw_ptr->line.getStart().y), 0.1f},
                         {float(sw_ptr->line.getEnd().x), float(sw_ptr->line.getEnd().y), 0.0f}};
                     rec->log_static("/division/swath" + std::to_string(m) + "_" + std::to_string(j),
+                                    rerun::LineStrips3D(rerun::components::LineStrip3D(pts))
+                                        .with_colors({{color}})
+                                        .with_radii({{radius}}));
+                }
+            }
+        }
+
+        // Version with part number support
+        inline void show_divisions(const Divy &divy, std::shared_ptr<rerun::RecordingStream> rec, size_t part_id,
+                                   float radius = 0.2f) {
+            static const std::vector<rerun::Color> palette = {{255, 0, 0},   {0, 255, 0},   {0, 0, 255},
+                                                              {255, 255, 0}, {0, 255, 255}, {255, 0, 255}};
+            auto const &div = divy.result();
+            for (auto const &kv : div.headlands_per_machine) {
+                size_t m = kv.first;
+                auto const &headlands = kv.second;
+                auto color = palette[m % palette.size()];
+                for (size_t j = 0; j < headlands.size(); ++j) {
+                    auto ring_ptr = headlands[j];
+                    std::vector<std::array<float, 3>> pts;
+                    for (auto const &p : ring_ptr->polygon.getPoints())
+                        pts.push_back({float(p.x), float(p.y), 0.1f});
+                    rec->log_static("/part" + std::to_string(part_id) + "/division/headland" + std::to_string(m) + "_" +
+                                        std::to_string(j),
+                                    rerun::LineStrips3D(rerun::components::LineStrip3D(pts))
+                                        .with_colors({{color}})
+                                        .with_radii({{radius}}));
+                }
+            }
+            for (auto const &kv : div.swaths_per_machine) {
+                size_t m = kv.first;
+                auto const &swaths = kv.second;
+                auto color = palette[m % palette.size()];
+                for (size_t j = 0; j < swaths.size(); ++j) {
+                    auto sw_ptr = swaths[j];
+                    std::vector<std::array<float, 3>> pts = {
+                        {float(sw_ptr->line.getStart().x), float(sw_ptr->line.getStart().y), 0.1f},
+                        {float(sw_ptr->line.getEnd().x), float(sw_ptr->line.getEnd().y), 0.0f}};
+                    rec->log_static("/part" + std::to_string(part_id) + "/division/swath" + std::to_string(m) + "_" +
+                                        std::to_string(j),
                                     rerun::LineStrips3D(rerun::components::LineStrip3D(pts))
                                         .with_colors({{color}})
                                         .with_radii({{radius}}));
@@ -151,19 +192,86 @@ namespace farmtrax {
             }
         }
 
+        // Version that takes swaths with part number support
+        inline void show_swath_tour(const std::vector<std::shared_ptr<const Swath>> &swaths,
+                                    std::shared_ptr<rerun::RecordingStream> rec, size_t part_id, size_t machine_id = 0,
+                                    float swath_radius = 0.4f, float connection_radius = 0.2f) {
+            static const std::vector<rerun::Color> palette = {{255, 0, 0},   {0, 255, 0},   {0, 0, 255},
+                                                              {255, 255, 0}, {0, 255, 255}, {255, 0, 255}};
+
+            auto base_color = palette[machine_id % palette.size()];
+            auto connection_color = rerun::Color(base_color.r() * 0.6, base_color.g() * 0.6, base_color.b() * 0.6);
+
+            if (swaths.empty())
+                return;
+
+            // Visualize each swath based on its type
+            for (size_t i = 0; i < swaths.size(); ++i) {
+                const auto &swath = swaths[i];
+
+                // Choose color and radius based on swath type
+                rerun::Color swath_color;
+                float radius;
+                std::string prefix;
+
+                if (swath->type == SwathType::Connection) {
+                    swath_color = connection_color;
+                    radius = connection_radius;
+                    prefix = "connection";
+                } else {
+                    swath_color = base_color;
+                    radius = swath_radius;
+                    prefix = "swath";
+                }
+
+                // Visualize the swath line
+                std::vector<std::array<float, 3>> line_points = {
+                    {float(swath->getHead().x), float(swath->getHead().y), 0.3f},
+                    {float(swath->getTail().x), float(swath->getTail().y), 0.3f}};
+
+                rec->log_static("/part" + std::to_string(part_id) + "/tour/machine" + std::to_string(machine_id) + "/" +
+                                    prefix + std::to_string(i),
+                                rerun::LineStrips3D(rerun::components::LineStrip3D(line_points))
+                                    .with_colors({{swath_color}})
+                                    .with_radii({{radius}}));
+            }
+
+            // Add machine start and end point markers
+            if (!swaths.empty()) {
+                const auto &first_swath = swaths[0];
+                const auto &last_swath = swaths[swaths.size() - 1];
+
+                std::vector<rerun::Position3D> start_point = {
+                    {float(first_swath->getHead().x), float(first_swath->getHead().y), 0.6f}};
+
+                std::vector<rerun::Position3D> end_point = {
+                    {float(last_swath->getTail().x), float(last_swath->getTail().y), 0.6f}};
+
+                rec->log_static("/part" + std::to_string(part_id) + "/tour/machine" + std::to_string(machine_id) +
+                                    "/start_marker",
+                                rerun::Points3D(start_point)
+                                    .with_colors({base_color}) // Same color as machine
+                                    .with_radii({2.0f}));      // Larger radius for visibility
+
+                rec->log_static("/part" + std::to_string(part_id) + "/tour/machine" + std::to_string(machine_id) +
+                                    "/end_marker",
+                                rerun::Points3D(end_point)
+                                    .with_colors({base_color}) // Same color as machine
+                                    .with_radii({2.0f}));      // Larger radius for visibility
+            }
+        }
+
         // Convenience overload that uses the reordered swaths from Nety
         inline void show_swath_tour(const farmtrax::Nety &nety, std::shared_ptr<rerun::RecordingStream> rec,
                                     size_t machine_id = 0, float swath_radius = 0.4f, float connection_radius = 0.2f) {
             show_swath_tour(nety.get_swaths(), rec, machine_id, swath_radius, connection_radius);
         }
 
-        // Overload that includes partition information for clearer naming
-        inline void show_swath_tour(const farmtrax::Nety &nety, std::shared_ptr<rerun::RecordingStream> rec,
-                                    size_t partition_id, size_t machine_id, float swath_radius = 0.4f,
-                                    float connection_radius = 0.2f) {
-            // Create a unique ID that includes both partition and machine
-            size_t unique_id = partition_id * 100 + machine_id;
-            show_swath_tour(nety.get_swaths(), rec, unique_id, swath_radius, connection_radius);
+        // Convenience overload with part number support
+        inline void show_swath_tour_for_part(const farmtrax::Nety &nety, std::shared_ptr<rerun::RecordingStream> rec,
+                                             size_t part_id, size_t machine_id, float swath_radius = 0.4f,
+                                             float connection_radius = 0.2f) {
+            show_swath_tour(nety.get_swaths(), rec, part_id, machine_id, swath_radius, connection_radius);
         }
 
         // Visualize obstacles as border-only polygons

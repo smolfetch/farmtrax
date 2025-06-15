@@ -489,7 +489,7 @@ namespace farmtrax {
 
             // Debug: Check polygon area and orientation
             double area = boost::geometry::area(bounds);
-            std::cout << "Polygon area: " << area << " (should be positive for correct orientation)" << std::endl;
+            // std::cout << "Polygon area: " << area << " (should be positive for correct orientation)" << std::endl;
 
             double rad = angle_deg * M_PI / 180.0;
             BPoint centroid;
@@ -506,8 +506,8 @@ namespace farmtrax {
             double line_ext = std::max(width, height) * 1.5;    // Extension for lines
             double max_offset = std::max(width, height) * 0.75; // Maximum offset from center
 
-            std::cout << "Generating swaths: centroid=(" << cx << "," << cy << "), angle=" << angle_deg
-                      << "°, line_ext=" << line_ext << ", max_offset=" << max_offset << std::endl;
+            // std::cout << "Generating swaths: centroid=(" << cx << "," << cy << "), angle=" << angle_deg
+            //           << "°, line_ext=" << line_ext << ", max_offset=" << max_offset << std::endl;
 
             int swath_count = 0;
             for (double offs = -max_offset; offs <= max_offset; offs += swath_width) {
@@ -531,7 +531,7 @@ namespace farmtrax {
                 }
             }
 
-            std::cout << "Generated " << swath_count << " swaths inside polygon" << std::endl;
+            // std::cout << "Generated " << swath_count << " swaths inside polygon" << std::endl;
 
             return out;
         }
