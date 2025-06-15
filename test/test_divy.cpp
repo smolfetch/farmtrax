@@ -10,11 +10,11 @@ std::shared_ptr<farmtrax::Part> create_test_part(const concord::Datum &datum = c
     // Create a simple rectangular polygon
     concord::Polygon poly;
     std::cout << "Debug: Adding polygon points" << std::endl;
-    poly.addPoint(concord::Point{concord::ENU{0.0, 0.0, 0.0}, datum});
-    poly.addPoint(concord::Point{concord::ENU{100.0, 0.0, 0.0}, datum});
-    poly.addPoint(concord::Point{concord::ENU{100.0, 50.0, 0.0}, datum});
-    poly.addPoint(concord::Point{concord::ENU{0.0, 50.0, 0.0}, datum});
-    poly.addPoint(concord::Point{concord::ENU{0.0, 0.0, 0.0}, datum}); // Close the polygon
+    poly.addPoint(concord::Point{0.0, 0.0, 0.0});
+    poly.addPoint(concord::Point{100.0, 0.0, 0.0});
+    poly.addPoint(concord::Point{100.0, 50.0, 0.0});
+    poly.addPoint(concord::Point{0.0, 50.0, 0.0});
+    poly.addPoint(concord::Point{0.0, 0.0, 0.0}); // Close the polygon
     std::cout << "Debug: Polygon created with " << poly.getPoints().size() << " points" << std::endl;
 
     // Create a field with the polygon - use large area threshold to avoid excessive partitioning
@@ -59,8 +59,8 @@ std::shared_ptr<farmtrax::Part> create_test_part(const concord::Datum &datum = c
             }
 
             // Make sure line is set
-            if (!swath.points.empty() && (swath.line.getStart().enu.x == 0 && swath.line.getStart().enu.y == 0 &&
-                                          swath.line.getEnd().enu.x == 0 && swath.line.getEnd().enu.y == 0)) {
+            if (!swath.points.empty() && (swath.line.getStart().x == 0 && swath.line.getStart().y == 0 &&
+                                          swath.line.getEnd().x == 0 && swath.line.getEnd().y == 0)) {
                 std::cout << "Debug: Setting line" << std::endl;
                 swath.line.setStart(swath.points.front());
                 swath.line.setEnd(swath.points.back());
@@ -184,13 +184,13 @@ TEST_CASE("Division Computation with Block Assignment") {
 
         for (const auto &swath : result.swaths_per_machine.at(0)) {
             // Use the line start point's x coordinate
-            avg_x_m0 += swath->line.getStart().enu.x;
+            avg_x_m0 += swath->line.getStart().x;
         }
         avg_x_m0 /= result.swaths_per_machine.at(0).size();
 
         for (const auto &swath : result.swaths_per_machine.at(1)) {
             // Use the line start point's x coordinate
-            avg_x_m1 += swath->line.getStart().enu.x;
+            avg_x_m1 += swath->line.getStart().x;
         }
         avg_x_m1 /= result.swaths_per_machine.at(1).size();
 

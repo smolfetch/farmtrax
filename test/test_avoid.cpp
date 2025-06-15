@@ -6,11 +6,11 @@
 concord::Polygon create_obstacle(const concord::Datum &datum = concord::Datum{}) {
     concord::Polygon obstacle;
     // Create a simple square obstacle at (50,25) with 10m sides
-    obstacle.addPoint(concord::Point{concord::ENU{45.0, 20.0, 0.0}, datum});
-    obstacle.addPoint(concord::Point{concord::ENU{55.0, 20.0, 0.0}, datum});
-    obstacle.addPoint(concord::Point{concord::ENU{55.0, 30.0, 0.0}, datum});
-    obstacle.addPoint(concord::Point{concord::ENU{45.0, 30.0, 0.0}, datum});
-    obstacle.addPoint(concord::Point{concord::ENU{45.0, 20.0, 0.0}, datum}); // Close the polygon
+    obstacle.addPoint(concord::Point{45.0, 20.0, 0.0});
+    obstacle.addPoint(concord::Point{55.0, 20.0, 0.0});
+    obstacle.addPoint(concord::Point{55.0, 30.0, 0.0});
+    obstacle.addPoint(concord::Point{45.0, 30.0, 0.0});
+    obstacle.addPoint(concord::Point{45.0, 20.0, 0.0}); // Close the polygon
     return obstacle;
 }
 
@@ -19,11 +19,11 @@ std::pair<farmtrax::Field, concord::Polygon>
 create_field_with_obstacle(const concord::Datum &datum = concord::Datum{}) {
     // Create a rectangular field - smaller and simpler for testing
     concord::Polygon field_poly;
-    field_poly.addPoint(concord::Point{concord::ENU{0.0, 0.0, 0.0}, datum});
-    field_poly.addPoint(concord::Point{concord::ENU{100.0, 0.0, 0.0}, datum});
-    field_poly.addPoint(concord::Point{concord::ENU{100.0, 50.0, 0.0}, datum});
-    field_poly.addPoint(concord::Point{concord::ENU{0.0, 50.0, 0.0}, datum});
-    field_poly.addPoint(concord::Point{concord::ENU{0.0, 0.0, 0.0}, datum}); // Close the polygon
+    field_poly.addPoint(concord::Point{0.0, 0.0, 0.0});
+    field_poly.addPoint(concord::Point{100.0, 0.0, 0.0});
+    field_poly.addPoint(concord::Point{100.0, 50.0, 0.0});
+    field_poly.addPoint(concord::Point{0.0, 50.0, 0.0});
+    field_poly.addPoint(concord::Point{0.0, 0.0, 0.0}); // Close the polygon
 
     // Create obstacle
     concord::Polygon obstacle = create_obstacle(datum);
@@ -61,7 +61,7 @@ TEST_CASE("Obstacle Avoidance with Concord Polygons") {
     std::cout << "Obstacle polygon points: " << obstacle.getPoints().size() << std::endl;
     std::cout << "Obstacle coords: ";
     for (const auto &pt : obstacle.getPoints()) {
-        std::cout << "(" << pt.enu.x << "," << pt.enu.y << ") ";
+        std::cout << "(" << pt.x << "," << pt.y << ") ";
     }
     std::cout << std::endl; // Create our own test swaths
     std::vector<std::shared_ptr<const farmtrax::Swath>> input_swaths;
@@ -73,8 +73,8 @@ TEST_CASE("Obstacle Avoidance with Concord Polygons") {
         swath->uuid = "swath_" + std::to_string(static_cast<int>(x));
 
         // Create a vertical line
-        concord::Point start(concord::ENU{x, 0.0, 0.0}, datum);
-        concord::Point end(concord::ENU{x, 50.0, 0.0}, datum);
+        concord::Point start(x, 0.0, 0.0);
+        concord::Point end(x, 50.0, 0.0);
         swath->line.setStart(start);
         swath->line.setEnd(end);
 
@@ -137,8 +137,8 @@ TEST_CASE("Obstacle Avoidance with Different Inflation Distances") {
         swath_ptr->uuid = "swath_" + std::to_string(static_cast<int>(x));
 
         // Create a vertical line
-        concord::Point start(concord::ENU{x, 0.0, 0.0}, datum);
-        concord::Point end(concord::ENU{x, 50.0, 0.0}, datum);
+        concord::Point start(x, 0.0, 0.0);
+        concord::Point end(x, 50.0, 0.0);
         swath_ptr->line.setStart(start);
         swath_ptr->line.setEnd(end);
 

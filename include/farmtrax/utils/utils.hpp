@@ -93,7 +93,7 @@ namespace farmtrax {
         inline bool are_colinear(const concord::Point &p1, const concord::Point &p2, const concord::Point &p3,
                                  double epsilon = 1e-10) {
             using BPoint = boost::geometry::model::d2::point_xy<double>;
-            BPoint a{p1.enu.x, p1.enu.y}, b{p2.enu.x, p2.enu.y}, c{p3.enu.x, p3.enu.y};
+            BPoint a{p1.x, p1.y}, b{p2.x, p2.y}, c{p3.x, p3.y};
             double area = (boost::geometry::get<0>(a) * (boost::geometry::get<1>(b) - boost::geometry::get<1>(c)) +
                            boost::geometry::get<0>(b) * (boost::geometry::get<1>(c) - boost::geometry::get<1>(a)) +
                            boost::geometry::get<0>(c) * (boost::geometry::get<1>(a) - boost::geometry::get<1>(b))) *
@@ -119,11 +119,10 @@ namespace farmtrax {
         }
 
         // Conversion functions between concord and boost geometry types
-        inline BPoint to_boost(const concord::Point &in) { return BPoint{in.enu.x, in.enu.y}; }
+        inline BPoint to_boost(const concord::Point &in) { return BPoint{in.x, in.y}; }
 
         inline concord::Point from_boost(const BPoint &in, const concord::Datum &datum = concord::Datum{}) {
-            concord::ENU pt{in.x(), in.y(), 0.0};
-            return concord::Point{pt, datum};
+            return concord::Point{in.x(), in.y(), 0.0};
         }
 
         inline BLineString to_boost(const concord::Line &L) {
@@ -146,8 +145,8 @@ namespace farmtrax {
 
             // Skip the last point if it's the same as the first (it's a closing point)
             size_t n = points.size();
-            size_t limit = (n > 0 && std::abs(points.front().enu.x - points.back().enu.x) < 1e-10 &&
-                            std::abs(points.front().enu.y - points.back().enu.y) < 1e-10)
+            size_t limit = (n > 0 && std::abs(points.front().x - points.back().x) < 1e-10 &&
+                            std::abs(points.front().y - points.back().y) < 1e-10)
                                ? n - 1
                                : n;
 
@@ -162,8 +161,9 @@ namespace farmtrax {
                 }
             }
 
-            // For testing purposes, we want to preserve the point order exactly
-            // Don't call boost::geometry::correct(out) as it can change point order
+            // Correct the polygon to ensure proper orientation and validity
+            // This is essential for intersection operations to work correctly
+            boost::geometry::correct(out);
 
             return out;
         }
@@ -189,9 +189,8 @@ namespace farmtrax {
             }
 
             // Make sure the polygon is closed by adding the first point at the end
-            if (!out.getPoints().empty() &&
-                (std::abs(out.getPoints().front().enu.x - out.getPoints().back().enu.x) > 1e-10 ||
-                 std::abs(out.getPoints().front().enu.y - out.getPoints().back().enu.y) > 1e-10)) {
+            if (!out.getPoints().empty() && (std::abs(out.getPoints().front().x - out.getPoints().back().x) > 1e-10 ||
+                                             std::abs(out.getPoints().front().y - out.getPoints().back().y) > 1e-10)) {
                 out.addPoint(out.getPoints().front());
             }
 

@@ -22,34 +22,34 @@ TEST_CASE("Geometry Utilities") {
 
     SUBCASE("are_colinear") {
         // Test colinear points
-        concord::Point p1(concord::ENU{0.0, 0.0, 0.0}, datum);
-        concord::Point p2(concord::ENU{1.0, 1.0, 0.0}, datum);
-        concord::Point p3(concord::ENU{2.0, 2.0, 0.0}, datum);
+        concord::Point p1(0.0, 0.0, 0.0);
+        concord::Point p2(1.0, 1.0, 0.0);
+        concord::Point p3(2.0, 2.0, 0.0);
         CHECK(farmtrax::utils::are_colinear(p1, p2, p3));
 
         // Test non-colinear points
-        concord::Point p4(concord::ENU{0.0, 0.0, 0.0}, datum);
-        concord::Point p5(concord::ENU{1.0, 1.0, 0.0}, datum);
-        concord::Point p6(concord::ENU{2.0, 1.0, 0.0}, datum);
+        concord::Point p4(0.0, 0.0, 0.0);
+        concord::Point p5(1.0, 1.0, 0.0);
+        concord::Point p6(2.0, 1.0, 0.0);
         CHECK_FALSE(farmtrax::utils::are_colinear(p4, p5, p6));
 
         // Test with epsilon
-        concord::Point p7(concord::ENU{0.0, 0.0, 0.0}, datum);
-        concord::Point p8(concord::ENU{1.0, 1.0, 0.0}, datum);
-        concord::Point p9(concord::ENU{2.0, 2.0001, 0.0}, datum); // Very slight deviation
-        CHECK(farmtrax::utils::are_colinear(p7, p8, p9, 0.001));  // Should be considered colinear with large epsilon
+        concord::Point p7(0.0, 0.0, 0.0);
+        concord::Point p8(1.0, 1.0, 0.0);
+        concord::Point p9(2.0, 2.0001, 0.0);                     // Very slight deviation
+        CHECK(farmtrax::utils::are_colinear(p7, p8, p9, 0.001)); // Should be considered colinear with large epsilon
         CHECK_FALSE(farmtrax::utils::are_colinear(p7, p8, p9, 1e-10)); // Should not be colinear with small epsilon
     }
 
     SUBCASE("remove_colinear_points") {
         // Create a polygon with some colinear points
         concord::Polygon poly;
-        poly.addPoint(concord::Point{concord::ENU{0.0, 0.0, 0.0}, datum});
-        poly.addPoint(concord::Point{concord::ENU{1.0, 0.0, 0.0}, datum});
-        poly.addPoint(concord::Point{concord::ENU{2.0, 0.0, 0.0}, datum}); // Colinear with the previous two
-        poly.addPoint(concord::Point{concord::ENU{2.0, 1.0, 0.0}, datum});
-        poly.addPoint(concord::Point{concord::ENU{0.0, 1.0, 0.0}, datum});
-        poly.addPoint(concord::Point{concord::ENU{0.0, 0.0, 0.0}, datum}); // Close the polygon
+        poly.addPoint(concord::Point{0.0, 0.0, 0.0});
+        poly.addPoint(concord::Point{1.0, 0.0, 0.0});
+        poly.addPoint(concord::Point{2.0, 0.0, 0.0}); // Colinear with the previous two
+        poly.addPoint(concord::Point{2.0, 1.0, 0.0});
+        poly.addPoint(concord::Point{0.0, 1.0, 0.0});
+        poly.addPoint(concord::Point{0.0, 0.0, 0.0}); // Close the polygon
 
         // Remove colinear points
         concord::Polygon simplified = farmtrax::utils::remove_colinear_points(poly, 0.01);
@@ -62,11 +62,11 @@ TEST_CASE("Geometry Utilities") {
     SUBCASE("polygon_to_boost and from_boost") {
         // Create a concord polygon
         concord::Polygon poly;
-        poly.addPoint(concord::Point{concord::ENU{0.0, 0.0, 0.0}, datum});
-        poly.addPoint(concord::Point{concord::ENU{1.0, 0.0, 0.0}, datum});
-        poly.addPoint(concord::Point{concord::ENU{1.0, 1.0, 0.0}, datum});
-        poly.addPoint(concord::Point{concord::ENU{0.0, 1.0, 0.0}, datum});
-        poly.addPoint(concord::Point{concord::ENU{0.0, 0.0, 0.0}, datum}); // Close the polygon
+        poly.addPoint(concord::Point{0.0, 0.0, 0.0});
+        poly.addPoint(concord::Point{1.0, 0.0, 0.0});
+        poly.addPoint(concord::Point{1.0, 1.0, 0.0});
+        poly.addPoint(concord::Point{0.0, 1.0, 0.0});
+        poly.addPoint(concord::Point{0.0, 0.0, 0.0}); // Close the polygon
 
         // Convert to boost polygon
         farmtrax::BPolygon boost_poly = farmtrax::utils::to_boost(poly);
@@ -85,8 +85,8 @@ TEST_CASE("Geometry Utilities") {
         const auto &original_pts = poly.getPoints();
         const auto &converted_pts = converted_poly.getPoints();
         for (size_t i = 0; i < std::min(original_pts.size(), converted_pts.size()); ++i) {
-            CHECK(original_pts[i].enu.x == doctest::Approx(converted_pts[i].enu.x));
-            CHECK(original_pts[i].enu.y == doctest::Approx(converted_pts[i].enu.y));
+            CHECK(original_pts[i].x == doctest::Approx(converted_pts[i].x));
+            CHECK(original_pts[i].y == doctest::Approx(converted_pts[i].y));
         }
     }
 }

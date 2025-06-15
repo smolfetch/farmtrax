@@ -28,8 +28,8 @@ std::vector<std::shared_ptr<farmtrax::Swath>> create_test_swaths(const concord::
         swath->centerline.push_back(farmtrax::BPoint(x, 100.0));
 
         // Create concord line
-        concord::Point start(concord::ENU{x, 0.0, 0.0}, datum);
-        concord::Point end(concord::ENU{x, 100.0, 0.0}, datum);
+        concord::Point start(x, 0.0, 0.0);
+        concord::Point end(x, 100.0, 0.0);
         swath->line.setStart(start);
         swath->line.setEnd(end);
 
@@ -71,8 +71,8 @@ TEST_CASE("ABLine Creation and Properties") {
     farmtrax::ABLine line1(a, b, "test_line_1", 1);
 
     // Create ABLine from concord points
-    concord::Point p1(concord::ENU{0.0, 0.0, 0.0}, datum);
-    concord::Point p2(concord::ENU{10.0, 0.0, 0.0}, datum);
+    concord::Point p1(0.0, 0.0, 0.0);
+    concord::Point p2(10.0, 0.0, 0.0);
     farmtrax::ABLine line2(p1, p2, "test_line_2", 2);
 
     // Check properties

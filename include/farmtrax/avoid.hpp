@@ -217,7 +217,7 @@ namespace farmtrax {
                 return; // Guard against null pointer
             }
 
-            BPoint start_point(original_swath->line.getStart().enu.x, original_swath->line.getStart().enu.y);
+            BPoint start_point(original_swath->line.getStart().x, original_swath->line.getStart().y);
 
             // Filter out empty or invalid segments
             segments.erase(

@@ -40,7 +40,7 @@ int main() {
     }
 
     for (auto &p : poly.getPoints()) {
-        std::cout << "x: " << p.enu.x << ", y: " << p.enu.y << ", z: " << p.enu.z << "\n";
+        std::cout << "x: " << p.x << ", y: " << p.y << ", z: " << p.z << "\n";
     }
 
     // === ADVANCED PARTITIONING DEMONSTRATION ===
@@ -48,13 +48,13 @@ int main() {
 
     // 1. Test basic partitioning with default criteria
     std::cout << "1. Testing default partitioning criteria:\n";
-    concord::Partitioner basic_partitioner(poly, datum);
+    concord::Partitioner basic_partitioner(poly);
     auto basic_parts = basic_partitioner.partition(20000.0); // 2 hectares
     std::cout << "   - Default criteria: " << basic_parts.size() << " parts\n";
 
     // 2. Test advanced multi-criteria partitioning
     std::cout << "\n2. Testing advanced multi-criteria partitioning:\n";
-    concord::Partitioner advanced_partitioner(poly, datum);
+    concord::Partitioner advanced_partitioner(poly);
 
     // Configure strict criteria for agricultural optimization
     concord::Partitioner::PartitionCriteria strict_criteria;
@@ -82,7 +82,7 @@ int main() {
     bridge_only.enable_tooth_detection = false;
     bridge_only.enable_aspect_splitting = false;
 
-    concord::Partitioner bridge_partitioner(poly, datum);
+    concord::Partitioner bridge_partitioner(poly);
     auto bridge_parts = bridge_partitioner.partition(50000.0, bridge_only);
     std::cout << "   - Bridge-only strategy: " << bridge_parts.size() << " parts\n";
 
@@ -95,7 +95,7 @@ int main() {
     shape_quality.enable_tooth_detection = true;
     shape_quality.enable_aspect_splitting = true;
 
-    concord::Partitioner shape_partitioner(poly, datum);
+    concord::Partitioner shape_partitioner(poly);
     auto shape_parts = shape_partitioner.partition(50000.0, shape_quality);
     std::cout << "   - Shape quality strategy: " << shape_parts.size() << " parts\n";
 
@@ -133,10 +133,10 @@ int main() {
     double max_y = std::numeric_limits<double>::lowest();
 
     for (const auto &point : poly.getPoints()) {
-        min_x = std::min(min_x, point.enu.x);
-        max_x = std::max(max_x, point.enu.x);
-        min_y = std::min(min_y, point.enu.y);
-        max_y = std::max(max_y, point.enu.y);
+        min_x = std::min(min_x, point.x);
+        max_x = std::max(max_x, point.x);
+        min_y = std::min(min_y, point.y);
+        max_y = std::max(max_y, point.y);
     }
 
     double center_x = (min_x + max_x) / 2.0;
@@ -149,12 +149,11 @@ int main() {
     concord::Polygon obstacle1;
     double obstacle_size = 15.0; // 15 meter square obstacle
 
-    obstacle1.addPoint(concord::Point{concord::ENU{center_x - obstacle_size, center_y - obstacle_size, 0}, datum});
-    obstacle1.addPoint(concord::Point{concord::ENU{center_x + obstacle_size, center_y - obstacle_size, 0}, datum});
-    obstacle1.addPoint(concord::Point{concord::ENU{center_x + obstacle_size, center_y + obstacle_size, 0}, datum});
-    obstacle1.addPoint(concord::Point{concord::ENU{center_x - obstacle_size, center_y + obstacle_size, 0}, datum});
-    obstacle1.addPoint(
-        concord::Point{concord::ENU{center_x - obstacle_size, center_y - obstacle_size, 0}, datum}); // Close polygon
+    obstacle1.addPoint(concord::Point(center_x - obstacle_size, center_y - obstacle_size, 0));
+    obstacle1.addPoint(concord::Point(center_x + obstacle_size, center_y - obstacle_size, 0));
+    obstacle1.addPoint(concord::Point(center_x + obstacle_size, center_y + obstacle_size, 0));
+    obstacle1.addPoint(concord::Point(center_x - obstacle_size, center_y + obstacle_size, 0));
+    obstacle1.addPoint(concord::Point(center_x - obstacle_size, center_y - obstacle_size, 0)); // Close polygon
 
     obstacles.push_back(obstacle1);
 

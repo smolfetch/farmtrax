@@ -23,11 +23,11 @@ namespace farmtrax {
 concord::Polygon create_test_polygon(const concord::Datum &datum = concord::Datum{}) {
     // Create a simple rectangular polygon
     concord::Polygon poly;
-    poly.addPoint(concord::Point{concord::ENU{0.0, 0.0, 0.0}, datum});
-    poly.addPoint(concord::Point{concord::ENU{100.0, 0.0, 0.0}, datum});
-    poly.addPoint(concord::Point{concord::ENU{100.0, 50.0, 0.0}, datum});
-    poly.addPoint(concord::Point{concord::ENU{0.0, 50.0, 0.0}, datum});
-    poly.addPoint(concord::Point{concord::ENU{0.0, 0.0, 0.0}, datum}); // Close the polygon
+    poly.addPoint(concord::Point{0.0, 0.0, 0.0});
+    poly.addPoint(concord::Point{100.0, 0.0, 0.0});
+    poly.addPoint(concord::Point{100.0, 50.0, 0.0});
+    poly.addPoint(concord::Point{0.0, 50.0, 0.0});
+    poly.addPoint(concord::Point{0.0, 0.0, 0.0}); // Close the polygon
     return poly;
 }
 
@@ -107,8 +107,8 @@ TEST_CASE("Field Generation Methods") {
                 if (!part.swaths.empty()) {
                     std::cout << "Swaths count: " << part.swaths.size() << std::endl;
                     const auto &swath = part.swaths[0];
-                    bool has_line = swath.line.getStart().enu.x != 0 || swath.line.getStart().enu.y != 0 ||
-                                    swath.line.getEnd().enu.x != 0 || swath.line.getEnd().enu.y != 0;
+                    bool has_line = swath.line.getStart().x != 0 || swath.line.getStart().y != 0 ||
+                                    swath.line.getEnd().x != 0 || swath.line.getEnd().y != 0;
                     CHECK(true);
                 }
             }

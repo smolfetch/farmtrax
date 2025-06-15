@@ -25,23 +25,23 @@ include(FetchContent)
 # --------------------------------------------------------------------------------------------------
 set(ext_deps)
 
-FetchContent_Declare(concord GIT_REPOSITORY https://github.com/smolfetch/concord.git GIT_TAG develop)
+FetchContent_Declare(concord GIT_REPOSITORY https://github.com/smolfetch/concord.git GIT_TAG 2.0.0)
 FetchContent_MakeAvailable(concord)
 list(APPEND ext_deps concord::concord)
 
-FetchContent_Declare(pigment GIT_REPOSITORY https://github.com/smolfetch/pigment.git GIT_TAG develop)
+FetchContent_Declare(pigment GIT_REPOSITORY https://github.com/smolfetch/pigment.git GIT_TAG 0.3.0)
 FetchContent_MakeAvailable(pigment)
 list(APPEND ext_deps pigment::pigment)
 
-FetchContent_Declare(entropy GIT_REPOSITORY https://github.com/smolfetch/entropy.git GIT_TAG develop)
+FetchContent_Declare(entropy GIT_REPOSITORY https://github.com/smolfetch/entropy.git GIT_TAG 0.1.0)
 FetchContent_MakeAvailable(entropy)
 list(APPEND ext_deps entropy::entropy)
 
-FetchContent_Declare(geoson GIT_REPOSITORY https://github.com/smolfetch/geoson.git GIT_TAG develop)
+FetchContent_Declare(geoson GIT_REPOSITORY https://github.com/smolfetch/geoson.git GIT_TAG 1.1.0)
 FetchContent_MakeAvailable(geoson)
 list(APPEND ext_deps geoson::geoson) 
 
-FetchContent_Declare(geotiv GIT_REPOSITORY https://github.com/smolfetch/geotiv.git GIT_TAG develop)
+FetchContent_Declare(geotiv GIT_REPOSITORY https://github.com/smolfetch/geotiv.git GIT_TAG 1.0.0)
 FetchContent_MakeAvailable(geotiv)
 list(APPEND ext_deps geotiv::geotiv)
 
