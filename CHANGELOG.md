@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.3.0] - 2025-06-15
+
+### <!-- 0 -->⛰️  Features
+
+- Add obstacle avoidance and visualization
+
+### <!-- 2 -->🚜 Refactor
+
+- Refactor examples and remove dead code
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Refactor for updated concord point structure
+
 ## [0.2.1] - 2025-06-13
 
 ### <!-- 6 -->🧪 Testing
